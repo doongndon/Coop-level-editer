@@ -21,6 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clear CPM cache
+        run: rm -rf cpm-cache
+        shell: bash
+
       - name: Use older, compatible Android NDK
         if: runner.os == 'Linux'
         uses: nttld/setup-ndk@v1
