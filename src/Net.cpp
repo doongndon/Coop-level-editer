@@ -2,6 +2,9 @@
 
 #include <ixwebsocket/IXWebSocket.h>
 
+#include <filesystem>
+#include <fstream>
+
 using namespace geode::prelude;
 
 namespace {
@@ -11,6 +14,24 @@ namespace {
 
     std::string settingString(char const* key) {
         return Mod::get()->getSettingValue<std::string>(key);
+    }
+
+    // 인증서 묶음을 파일로 한 번 꺼내놓고 그 경로를 돌려준다.
+    // 내용을 그대로 넘기는 방법도 있지만 IXWebSocket v11.4.6은 그 경우
+    // 검사 단계에서 "파일이 없다"며 막아버려서 파일로 쓰는 편이 확실하다.
+    std::string caBundlePath() {
+        auto path = Mod::get()->getSaveDir() / "cacert.pem";
+
+        std::error_code ec;
+        if (!std::filesystem::exists(path, ec)) {
+            std::ofstream out(path, std::ios::binary);
+            if (!out) {
+                log::warn("인증서 묶음을 저장하지 못했습니다. wss:// 접속이 실패할 수 있습니다");
+                return "";
+            }
+            out << coop::caBundlePem();
+        }
+        return path.string();
     }
 
     void sendJoin() {
@@ -75,6 +96,15 @@ namespace coop {
 
         g_state = State::Connecting;
         g_socket.setUrl(url);
+
+        // 주소가 wss:// 면 IXWebSocket이 알아서 암호화 연결을 쓴다.
+        // 다만 신뢰할 인증서는 우리가 알려줘야 한다.
+        if (auto caPath = caBundlePath(); !caPath.empty()) {
+            ix::SocketTLSOptions tlsOptions;
+            tlsOptions.caFile = caPath;
+            g_socket.setTLSOptions(tlsOptions);
+        }
+
         g_socket.setOnMessageCallback(&onSocketMessage);
         g_socket.enableAutomaticReconnection();
         g_socket.start();

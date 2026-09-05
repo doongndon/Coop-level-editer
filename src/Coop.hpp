@@ -58,4 +58,10 @@ namespace coop {
     // 서버에서 받은 내용을 적용하는 중인지. 적용 중에는 되돌려 보내지 않는다.
     bool isApplyingRemote();
 
+    // --- 인증서 (빌드할 때 생성되는 CaBundle.cpp) ---
+
+    // wss:// 접속 때 신뢰할 인증서 묶음 전문.
+    // 안드로이드에서는 시스템 인증서를 읽을 수 없어 모드가 직접 들고 있어야 한다.
+    char const* caBundlePem();
+
 }
