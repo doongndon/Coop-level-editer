@@ -7,6 +7,7 @@
 #include <random>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 using namespace geode::prelude;
@@ -38,6 +39,10 @@ namespace {
 
     // 마지막으로 방과 맞춘 레벨 설정 문자열. 달라졌을 때만 보내기 위한 것.
     std::string g_lastSettings;
+    // 마지막으로 상대에게 알린 내 상태. 바뀌었을 때만 보낸다.
+    std::string g_lastStats;
+    unsigned int g_statsTick = 0;
+    constexpr unsigned int STATS_EVERY = 8;   // 0.25초 x 8 = 2초
 
     // 방금 만들어진 오브젝트들.
     //
@@ -51,6 +56,12 @@ namespace {
     // 한 프레임에 몰리면 게임이 끊기기 때문.
     unsigned int g_scanIndex = 0;
     constexpr unsigned int SCAN_SLICE = 60;
+
+    // 테스트 플레이 중인지. 그동안은 게임이 오브젝트를 마음대로 옮기고 떼어내서
+    // 무엇이 지워졌는지 판단할 수 없다.
+    bool isPlaytesting(LevelEditorLayer* editor) {
+        return editor && editor->m_playbackMode != PlaybackMode::Not;
+    }
 
     // 삭제 확인은 매 틱 할 필요가 없어서 몇 번에 한 번만 한다.
     unsigned int g_sweepTick = 0;
@@ -77,13 +88,42 @@ namespace {
         return std::string(object->getSaveString(editor));
     }
 
-    // 아직 레벨 안에 있는 오브젝트인지.
+    // 레벨에 실제로 들어 있는 오브젝트들.
     //
-    // 우리는 오브젝트를 Ref로 붙잡고 있어서 게임이 레벨에서 빼내도 사라지지 않는다.
-    // 그래서 "살아 있다"와 "레벨에 있다"가 다르다. 이미 빠진 것을 다시 지우라고
-    // 시키면 게임이 없는 자리를 뒤지다 죽는다. 지우기 전에 반드시 확인해야 한다.
+    // 예전에는 "부모가 있으면 레벨에 있는 것"으로 봤는데, 그게 큰 사고를 냈다.
+    // 게임은 화면 밖으로 나간 오브젝트를 화면 구성에서 잠시 떼어낸다. 부모가
+    // 없어지지만 레벨에서 지워진 것은 아니다. 그걸 삭제로 착각해서, 상대
+    // 화면에서 안 보이게 된 물건을 진짜로 지워버렸다.
+    //
+    // 레벨의 진짜 목록은 m_objects다. 화면에 보이든 말든 여기에는 다 들어 있다.
+    // 매번 훑기엔 무거워서 목록을 따로 들고 있다가 주기적으로 다시 맞춘다.
+    std::unordered_set<GameObject*> g_present;
+
+    void refreshPresent(LevelEditorLayer* editor) {
+        g_present.clear();
+        if (!editor || !editor->m_objects) return;
+
+        auto total = editor->m_objects->count();
+        g_present.reserve(total);
+        for (unsigned int i = 0; i < total; ++i) {
+            g_present.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
+        }
+    }
+
+    // 목록이 레벨과 어긋났는지 값싸게 확인한다.
+    //
+    // 우리가 만들거나 지울 때마다 목록을 같이 고치고 있어서 보통은 맞다.
+    // 우리가 못 본 경로로 바뀌었을 때만 개수가 어긋나는데, 개수 비교는
+    // 공짜라서 매번 해도 부담이 없다.
+    void ensurePresent(LevelEditorLayer* editor) {
+        if (!editor || !editor->m_objects) return;
+        if (g_present.size() != editor->m_objects->count()) {
+            refreshPresent(editor);
+        }
+    }
+
     bool isInLevel(GameObject* object) {
-        return object && object->getParent();
+        return object && g_present.contains(object);
     }
 
     void forget(std::string const& uid) {
@@ -165,6 +205,10 @@ namespace {
     GameObject* spawnFromSaveString(LevelEditorLayer* editor, std::string const& data) {
         auto created = editor->createObjectsFromString(data, true, true);
         if (!created || created->count() == 0) return nullptr;
+
+        for (unsigned int i = 0; i < created->count(); ++i) {
+            g_present.insert(static_cast<GameObject*>(created->objectAtIndex(i)));
+        }
         return static_cast<GameObject*>(created->objectAtIndex(0));
     }
 
@@ -260,6 +304,10 @@ namespace {
     // 그래서 우리가 아는 오브젝트가 아직 레벨에 붙어 있는지 직접 확인한다.
     // 결과만 보는 방식이라 어떤 경로로 지워졌든 빠짐없이 잡힌다.
     void sweepRemoved() {
+        // 판단하기 직전에 레벨의 진짜 목록을 다시 읽는다.
+        // 오래된 목록으로 지우면 멀쩡한 물건을 지우게 된다.
+        refreshPresent(LevelEditorLayer::get());
+
         std::vector<std::string> gone;
         for (auto const& [uid, held] : g_objectByUid) {
             if (!isInLevel(held.data())) gone.push_back(uid);
@@ -300,6 +348,7 @@ namespace coop {
         g_sweepTick = 0;
         g_active = false;
         g_lastSettings.clear();
+        g_lastStats.clear();
         forgetAppliedSettings();
 
         matjson::Value msg;
@@ -348,6 +397,23 @@ namespace coop {
         g_active = true;
     }
 
+    // 내 상태를 상대에게 알린다.
+    //
+    // 두 기기를 오가며 확인하는 것이 번거로워서 만들었다. 한쪽 화면만 봐도
+    // 상대가 몇 개를 갖고 있는지, 커서가 오가는지 알 수 있다.
+    void sendStats() {
+        if (!inRoom()) return;
+
+        auto text = diagnostics();
+        if (text == g_lastStats) return;
+        g_lastStats = text;
+
+        matjson::Value msg;
+        msg["type"] = "stats";
+        msg["text"] = text;
+        send(std::move(msg));
+    }
+
     void syncLevelSettings() {
         if (!inRoom() || g_applyingRemote) return;
 
@@ -377,6 +443,8 @@ namespace coop {
         auto editor = LevelEditorLayer::get();
         if (!editor || !editor->m_objects) return;
 
+        ensurePresent(editor);
+
         // 훅에서 담아둔 새 오브젝트를 게임 일이 끝난 지금 처리한다.
         if (!g_pending.empty()) {
             auto pending = std::move(g_pending);
@@ -385,6 +453,11 @@ namespace coop {
                 inspect(editor, held.data());
             }
         }
+
+        // 테스트 플레이 중에는 아무것도 보내지 않는다. 그동안 게임이
+        // 오브젝트를 옮기고 떼어내기 때문에, 그걸 편집으로 오해하면
+        // 상대 레벨이 엉망이 된다.
+        if (isPlaytesting(editor)) return;
 
         // 사라진 것을 먼저 확인한다. 삭제는 상대 화면에 남아 있으면
         // 그 위에 계속 덧그리게 되어 가장 헷갈리는 어긋남이 된다.
@@ -395,6 +468,12 @@ namespace coop {
 
         // 배경, 바닥, 색깔, 노래가 달라졌으면 알린다.
         syncLevelSettings();
+
+        // 내 상태를 가끔 알린다. 상대 화면에서 내 쪽이 잘 도는지 보이도록.
+        if (++g_statsTick >= STATS_EVERY) {
+            g_statsTick = 0;
+            sendStats();
+        }
 
         auto objects = editor->m_objects;
         auto total = objects->count();
@@ -434,6 +513,9 @@ namespace coop {
     void handleMessage(matjson::Value const& msg) {
         auto editor = LevelEditorLayer::get();
         if (!editor) return;
+
+        // 레벨을 건드리기 전에 우리 목록이 레벨과 맞는지 확인한다.
+        ensurePresent(editor);
 
         auto type = msg["type"].asString().unwrapOr("");
         RemoteScope scope;
@@ -485,6 +567,8 @@ namespace coop {
 class $modify(CoopLevelEditorLayer, LevelEditorLayer) {
     void removeObject(GameObject* object, bool noUndo) {
         if (!coop::isApplyingRemote() && object) {
+            g_present.erase(object);
+
             if (auto it = g_uidByLocalId.find(object->m_uniqueID); it != g_uidByLocalId.end()) {
                 auto uid = it->second;
                 forget(uid);

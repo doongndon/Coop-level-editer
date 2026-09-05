@@ -147,7 +147,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v5 (one shared level + songs)";
+const SERVER_VERSION = "v6 (peer stats)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -258,6 +258,18 @@ wss.on("connection", client => {
             // 에디터에 새로 들어왔으니 현재 상태를 다시 달라는 요청
             case "resync":
                 sendState(room, client);
+                return;
+
+            // 상대가 지금 무엇을 얼마나 주고받고 있는지. 보관하지 않고 흘려보낸다.
+            // 두 기기를 오가지 않고 한쪽 화면에서 양쪽 상태를 보려는 것이다.
+            case "stats":
+                if (typeof msg.text !== "string") return;
+                relay(room, client, {
+                    type: "stats",
+                    from: client.clientId,
+                    name: client.playerName,
+                    text: msg.text.slice(0, 120),
+                });
                 return;
 
             // 커서는 계속 바뀌는 값이라 보관하지 않고 그대로 흘려보낸다.

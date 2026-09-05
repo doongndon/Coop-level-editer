@@ -249,10 +249,15 @@ namespace coop {
     }
 
     // 어디가 끊겼는지 창에서 바로 보려고 모아 보여준다.
-    // cur = 커서 보낸/받은 개수, col = 색 글자수 보낸/받은, ok = 반영한 통로 수
+    // obj = 내 레벨의 오브젝트 수, cur = 커서 보낸/받은,
+    // col = 색 글자수 보낸/받은, ok = 반영한 색 통로 수
     std::string diagnostics() {
+        auto editor = LevelEditorLayer::get();
+        auto objects = (editor && editor->m_objects) ? editor->m_objects->count() : 0u;
+
         return fmt::format(
-            "cur {}/{}  col {}/{}  ok {}",
+            "obj {}  cur {}/{}  col {}/{}  ok {}",
+            objects,
             cursorsSent(), cursorsReceived(),
             g_colorCharsOut, g_colorCharsIn, g_colorsApplied
         );

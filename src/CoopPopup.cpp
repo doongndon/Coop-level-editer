@@ -94,9 +94,10 @@ bool CoopPopup::init() {
 
     // 커서와 색이 실제로 오가고 있는지. 안 될 때 어느 쪽이 끊겼는지 바로 보인다.
     m_debugLabel = CCLabelBMFont::create("", "chatFont.fnt");
-    m_debugLabel->setScale(0.5f);
+    m_debugLabel->setScale(0.45f);
     m_debugLabel->setColor({ 255, 220, 120 });
-    m_mainLayer->addChildAtPosition(m_debugLabel, Anchor::Bottom, ccp(0.f, 62.f));
+    m_debugLabel->setAlignment(kCCTextAlignmentCenter);
+    m_mainLayer->addChildAtPosition(m_debugLabel, Anchor::Bottom, ccp(0.f, 64.f));
 
     // --- 접속 상태 ---
     m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
@@ -178,7 +179,13 @@ void CoopPopup::tick(float) {
     }
 
     if (m_debugLabel) {
-        m_debugLabel->setString(coop::diagnostics().c_str());
+        // 내 상태와 상대 상태를 같이 보여준다. 두 기기를 오갈 일이 없도록.
+        auto theirs = coop::peerStats();
+        m_debugLabel->setString(
+            theirs.empty()
+                ? fmt::format("me: {}", coop::diagnostics()).c_str()
+                : fmt::format("me: {}\n{}", coop::diagnostics(), theirs).c_str()
+        );
     }
 
     if (m_versionLabel) {

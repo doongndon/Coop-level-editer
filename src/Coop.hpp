@@ -141,6 +141,10 @@ namespace coop {
 
     // 어디가 끊겼는지 한 줄로 보여준다. 화면에서 바로 보려고.
     std::string diagnostics();
+    // 상대가 알려준 상태. 두 기기를 오가지 않고 한 화면에서 보기 위한 것.
+    std::string peerStats();
+    // 내 상태를 상대에게 알린다. 주기적으로 부른다.
+    void sendStats();
 
     // --- 모드 갱신 (Updater.cpp) ---
     //

@@ -34,6 +34,9 @@ namespace {
     // 서버가 알려준 자기 버전. 배포가 갱신됐는지 창에서 바로 보려고 받아둔다.
     std::string g_serverVersion;
 
+    // 상대가 알려준 자기 상태. 두 기기를 오가지 않고 한 화면에서 보려는 것.
+    std::string g_peerStats;
+
     // 아직 접속 전에 "방 만들기"를 누른 경우. 연결되면 들어가기 대신 만들기를 보낸다.
     std::atomic<bool> g_createOnConnect = false;
 
@@ -151,6 +154,15 @@ namespace {
                 return;
             }
 
+            if (type == "stats") {
+                g_peerStats = fmt::format(
+                    "{}: {}",
+                    value["name"].asString().unwrapOr("?"),
+                    value["text"].asString().unwrapOr("")
+                );
+                return;
+            }
+
             if (type == "peers") {
                 g_peerCount = static_cast<int>(value["count"].asInt().unwrapOr(0));
                 return;
@@ -259,6 +271,7 @@ namespace coop {
         // 서버가 방을 확인해주기 전까지는 방 밖이다.
         g_currentRoom.clear();
         g_serverVersion.clear();
+        g_peerStats.clear();
 
         if (url.empty()) {
             g_state = State::Disconnected;
@@ -302,6 +315,10 @@ namespace coop {
 
     std::string serverVersion() {
         return g_serverVersion;
+    }
+
+    std::string peerStats() {
+        return g_peerStats;
     }
 
     void send(matjson::Value msg) {
