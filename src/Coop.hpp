@@ -3,6 +3,7 @@
 #include <Geode/Geode.hpp>
 
 #include <string>
+#include <vector>
 
 // 협동 편집 기능의 공용 인터페이스.
 //
@@ -30,6 +31,23 @@ namespace coop {
     int peerCount();
     // 마지막 접속 실패 이유. 성공했거나 아직 시도 전이면 빈 문자열.
     std::string lastError();
+
+    // 이 사람의 GD 계정 이름.
+    std::string defaultPlayerName();
+    // 지금 들어가 있는 방 이름.
+    std::string currentRoom();
+    // 이 사람의 기본 방 이름. 계정 이름을 따서 만든다.
+    std::string defaultRoomName();
+    // 방을 바꾸고 다시 접속한다.
+    void joinRoom(std::string room);
+
+    // 열려 있는 방 목록을 서버에 요청한다. 답이 오면 목록이 채워진다.
+    void requestRoomList();
+    struct RoomEntry {
+        std::string name;
+        int count = 0;
+    };
+    std::vector<RoomEntry> roomList();
     // 연결돼 있을 때만 실제로 보낸다.
     void send(matjson::Value msg);
 
@@ -59,6 +77,19 @@ namespace coop {
 
     // 서버에서 받은 내용을 적용하는 중인지. 적용 중에는 되돌려 보내지 않는다.
     bool isApplyingRemote();
+
+    // --- 상대 커서 (Cursors.cpp) ---
+
+    // 내 손가락이 있는 자리를 상대에게 알린다. 레벨 기준 좌표.
+    void sendCursor(cocos2d::CCPoint position);
+    // 서버에서 온 커서 메시지를 화면에 반영한다.
+    void applyCursor(std::string const& id, std::string const& name, cocos2d::CCPoint position);
+    // 나간 사람의 커서를 치운다.
+    void removeCursor(std::string const& id);
+    // 에디터를 새로 열었으니 커서를 모두 치운다.
+    void clearCursors();
+    // 한동안 소식 없는 커서를 치운다. 주기적으로 부른다.
+    void fadeOldCursors();
 
     // --- 인증서 (빌드할 때 생성되는 CaBundle.cpp) ---
 

@@ -4,8 +4,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <Geode/ui/Notification.hpp>
+
 #include <mutex>
 #include <string>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -19,6 +22,9 @@ namespace {
     // 무엇을 고쳐야 할지 알 수가 없다.
     std::mutex g_errorMutex;
     std::string g_lastError;
+
+    // 서버가 알려준 방 목록. 메인 스레드에서만 쓴다.
+    std::vector<coop::RoomEntry> g_roomList;
 
     void setLastError(std::string reason) {
         std::lock_guard lock(g_errorMutex);
@@ -50,7 +56,9 @@ namespace {
     void sendJoin() {
         matjson::Value msg;
         msg["type"] = "join";
-        msg["room"] = settingString("room-name");
+        msg["room"] = coop::currentRoom();
+        // 상대 화면에 누구 커서인지 띄우려면 이름이 필요하다.
+        msg["name"] = coop::defaultPlayerName();
         g_socket.send(msg.dump(matjson::NO_INDENTATION));
     }
 
@@ -97,10 +105,54 @@ namespace {
         // 소켓 콜백은 별도 스레드에서 불린다. 게임 오브젝트를 만지는 일은
         // 반드시 메인 스레드로 넘겨야 한다.
         Loader::get()->queueInMainThread([value = std::move(parsed).unwrap()]() {
-            if (value["type"].asString().unwrapOr("") == "peers") {
+            auto type = value["type"].asString().unwrapOr("");
+
+            if (type == "peers") {
                 g_peerCount = static_cast<int>(value["count"].asInt().unwrapOr(0));
                 return;
             }
+
+            if (type == "rooms") {
+                g_roomList.clear();
+                auto list = value["list"];
+                if (list.isArray()) {
+                    for (auto const& entry : list) {
+                        coop::RoomEntry room;
+                        room.name = entry["name"].asString().unwrapOr("");
+                        room.count = static_cast<int>(entry["count"].asInt().unwrapOr(0));
+                        if (!room.name.empty()) g_roomList.push_back(std::move(room));
+                    }
+                }
+                return;
+            }
+
+            if (type == "cursor") {
+                coop::applyCursor(
+                    value["from"].asString().unwrapOr(""),
+                    value["name"].asString().unwrapOr(""),
+                    cocos2d::CCPoint(
+                        static_cast<float>(value["x"].asDouble().unwrapOr(0)),
+                        static_cast<float>(value["y"].asDouble().unwrapOr(0))
+                    )
+                );
+                return;
+            }
+
+            if (type == "left") {
+                coop::removeCursor(value["from"].asString().unwrapOr(""));
+                return;
+            }
+
+            if (type == "joined") {
+                if (Mod::get()->getSettingValue<bool>("show-notifications")) {
+                    auto who = value["name"].asString().unwrapOr("Someone");
+                    Notification::create(
+                        fmt::format("{} joined the room", who), NotificationIcon::Info
+                    )->show();
+                }
+                return;
+            }
+
             coop::handleMessage(value);
         });
     }
@@ -157,6 +209,39 @@ namespace coop {
     void send(matjson::Value msg) {
         if (g_state != State::Connected) return;
         g_socket.send(msg.dump(matjson::NO_INDENTATION));
+    }
+
+    std::string defaultPlayerName() {
+        if (auto manager = GameManager::sharedState()) {
+            auto name = std::string(manager->m_playerName);
+            if (!name.empty()) return name;
+        }
+        return "Player";
+    }
+
+    std::string defaultRoomName() {
+        return defaultPlayerName() + "'s room";
+    }
+
+    std::string currentRoom() {
+        auto room = settingString("room-name");
+        // 비워두면 자기 방으로 들어간다. 아무것도 안 해도 바로 쓸 수 있도록.
+        return room.empty() ? defaultRoomName() : room;
+    }
+
+    void joinRoom(std::string room) {
+        Mod::get()->setSettingValue<std::string>("room-name", std::move(room));
+        connect();
+    }
+
+    void requestRoomList() {
+        matjson::Value msg;
+        msg["type"] = "rooms";
+        send(std::move(msg));
+    }
+
+    std::vector<RoomEntry> roomList() {
+        return g_roomList;
     }
 
 }

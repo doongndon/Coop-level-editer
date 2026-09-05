@@ -4,6 +4,8 @@
 // - 같은 방에 있는 사람끼리 오브젝트 변경 내용을 전달한다.
 // - 방의 현재 오브젝트 상태를 들고 있다가, 나중에 들어온 사람에게 통째로 보내준다.
 //   (이게 없으면 접속 전에 만들어둔 것이 상대에게 보이지 않는다.)
+// - 열려 있는 방 목록을 알려준다. 방 이름을 직접 치지 않아도 되도록.
+// - 상대가 어디를 만지고 있는지(커서) 전달한다. 이건 보관하지 않고 흘려보낸다.
 const http = require("http");
 const { WebSocketServer } = require("ws");
 
@@ -13,6 +15,8 @@ const PORT = process.env.PORT || 8787;
 
 // 방 이름 -> { clients: Set, objects: Map<uid, 저장문자열> }
 const rooms = new Map();
+
+let nextClientId = 1;
 
 function getRoom(name) {
     if (!rooms.has(name)) {
@@ -52,6 +56,18 @@ function sendState(room, client) {
     sendTo(client, { type: "state", objects });
 }
 
+// 사람이 있는 방만 알려준다. 비어 있는 방은 목록에 띄워봐야 의미가 없다.
+function sendRoomList(client) {
+    const list = [];
+    for (const [name, room] of rooms) {
+        if (room.clients.size > 0) {
+            list.push({ name, count: room.clients.size });
+        }
+    }
+    list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    sendTo(client, { type: "rooms", list });
+}
+
 function leaveRoom(client) {
     const room = rooms.get(client.roomName);
     if (!room) return;
@@ -62,13 +78,12 @@ function leaveRoom(client) {
         // 아무도 없어도 만들어둔 내용은 남겨둔다. 다시 들어오면 이어서 작업할 수 있다.
         console.log(`[비었음] 방 "${client.roomName}" - 오브젝트 ${room.objects.size}개 보관 중`);
     } else {
+        // 남은 사람들이 이 사람의 커서를 지울 수 있도록 알린다.
+        relay(room, client, { type: "left", from: client.clientId });
         announcePeers(room);
     }
 }
 
-// 호스팅 업체는 서버가 살아있는지 일반 접속으로 주기적으로 확인한다.
-// 웹소켓만 받고 아무 대답도 하지 않으면 죽은 줄 알고 내려버리므로,
-// 같은 포트에서 일반 접속에도 짧게 대답해준다.
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
     res.end(`중계 서버 동작 중 - 방 ${rooms.size}개\n`);
@@ -78,6 +93,8 @@ const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", client => {
     client.roomName = null;
+    client.clientId = String(nextClientId++);
+    client.playerName = "Player";
 
     client.on("message", raw => {
         let msg;
@@ -87,18 +104,28 @@ wss.on("connection", client => {
             return;
         }
 
+        // 방에 들어가기 전에도 목록은 볼 수 있어야 한다.
+        if (msg.type === "rooms") {
+            sendRoomList(client);
+            return;
+        }
+
         if (msg.type === "join") {
             if (typeof msg.room !== "string" || msg.room === "") return;
 
             leaveRoom(client);
             client.roomName = msg.room;
+            if (typeof msg.name === "string" && msg.name !== "") {
+                client.playerName = msg.name.slice(0, 32);
+            }
 
             const room = getRoom(msg.room);
             room.clients.add(client);
 
-            console.log(`[입장] 방 "${msg.room}" - 현재 ${room.clients.size}명`);
+            console.log(`[입장] 방 "${msg.room}" - ${client.playerName} (현재 ${room.clients.size}명)`);
             sendState(room, client);
             announcePeers(room);
+            relay(room, client, { type: "joined", name: client.playerName });
             return;
         }
 
@@ -109,6 +136,18 @@ wss.on("connection", client => {
             // 에디터에 새로 들어왔으니 현재 상태를 다시 달라는 요청
             case "resync":
                 sendState(room, client);
+                return;
+
+            // 커서는 계속 바뀌는 값이라 보관하지 않고 그대로 흘려보낸다.
+            case "cursor":
+                if (typeof msg.x !== "number" || typeof msg.y !== "number") return;
+                relay(room, client, {
+                    type: "cursor",
+                    from: client.clientId,
+                    name: client.playerName,
+                    x: msg.x,
+                    y: msg.y,
+                });
                 return;
 
             case "add":
@@ -135,7 +174,7 @@ wss.on("connection", client => {
     client.on("close", () => {
         const name = client.roomName;
         leaveRoom(client);
-        if (name) console.log(`[퇴장] 방 "${name}"`);
+        if (name) console.log(`[퇴장] 방 "${name}" - ${client.playerName}`);
     });
 });
 

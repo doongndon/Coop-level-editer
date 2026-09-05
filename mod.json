@@ -4,7 +4,7 @@
         "win": "2.2081",
         "android": "2.2081"
     },
-    "version": "v0.1.0",
+    "version": "v0.2.0",
     "id": "com.yourname.coopedit",
     "name": "Coop Level Editor",
     "developer": "yourname",
@@ -12,15 +12,33 @@
     "settings": {
         "server-url": {
             "name": "Server Address",
-            "description": "Enter a ws:// or wss:// address",
+            "description": "Leave this alone unless the server has moved. The room window uses this automatically.",
             "type": "string",
-            "default": "ws://YOUR_SERVER_ADDRESS:8787"
+            "default": "wss://coop-level-editer.onrender.com"
         },
         "room-name": {
             "name": "Room Name",
-            "description": "Use the same name as your partner",
+            "description": "Set from the room window. Empty means your own room.",
             "type": "string",
-            "default": "test-room"
+            "default": ""
+        },
+        "show-cursors": {
+            "name": "Show Partner Cursors",
+            "description": "Show where your partner is touching the editor",
+            "type": "bool",
+            "default": true
+        },
+        "show-notifications": {
+            "name": "Join Notifications",
+            "description": "Show a message when someone joins or leaves your room",
+            "type": "bool",
+            "default": true
+        },
+        "auto-join": {
+            "name": "Auto Join",
+            "description": "Connect automatically when you open the editor",
+            "type": "bool",
+            "default": true
         }
     }
 }

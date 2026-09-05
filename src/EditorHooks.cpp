@@ -47,7 +47,15 @@ class $modify(CoopEditorUI, EditorUI) {
         this->addChild(menu);
         m_fields->m_menu = menu;
 
+        coop::clearCursors();
         coop::enterEditor();
+
+        // 설정에서 꺼두지 않았으면 에디터에 들어올 때 알아서 접속한다.
+        if (Mod::get()->getSettingValue<bool>("auto-join")
+            && coop::state() == coop::State::Disconnected) {
+            coop::connect();
+        }
+
         this->updateCoopStatus();
 
         this->schedule(schedule_selector(CoopEditorUI::coopTick), 0.25f);
@@ -94,7 +102,19 @@ class $modify(CoopEditorUI, EditorUI) {
         // 그다음 레벨 전체를 조금씩 나눠 훑는다. 되돌리기처럼 어떤 경로로 바뀌었든
         // 결과적으로 달라진 것이 있으면 여기서 잡힌다.
         coop::reconcile();
+        coop::fadeOldCursors();
         this->updateCoopStatus();
+    }
+
+    // 손가락이 움직일 때마다 상대에게 위치를 알린다.
+    // 화면 좌표가 아니라 레벨 좌표로 바꿔서 보내야 서로 같은 곳을 가리킨다.
+    // 사람마다 화면 크기와 확대 배율이 다르기 때문이다.
+    void ccTouchMoved(CCTouch* touch, CCEvent* event) {
+        EditorUI::ccTouchMoved(touch, event);
+
+        if (auto editor = LevelEditorLayer::get(); editor && editor->m_objectLayer && touch) {
+            coop::sendCursor(editor->m_objectLayer->convertToNodeSpace(touch->getLocation()));
+        }
     }
 
     GameObject* createObject(int objectID, CCPoint position) {

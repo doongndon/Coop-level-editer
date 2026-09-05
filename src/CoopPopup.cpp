@@ -3,135 +3,175 @@
 
 #include <Geode/ui/Notification.hpp>
 
-#include <random>
-
 using namespace geode::prelude;
 
 namespace {
-    // 방 이름을 직접 짓지 않아도 되도록 읽기 쉬운 이름을 만들어준다.
-    // 상대에게 불러주기 쉬워야 해서 헷갈리는 글자(0/O, 1/l)는 쓰지 않는다.
-    std::string randomRoomName() {
-        static char const* words[] = {
-            "cube", "wave", "ship", "ball", "ufo", "robot", "spider", "swing",
-            "dash", "portal", "spike", "orb", "pad", "coin", "star", "moon",
-        };
-        static char const* digits = "23456789";
-
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        auto word = words[gen() % (sizeof(words) / sizeof(words[0]))];
-        std::string number;
-        for (int i = 0; i < 3; ++i) {
-            number += digits[gen() % 8];
-        }
-        return fmt::format("{}-{}", word, number);
-    }
+    // 목록에 너무 많이 띄우면 창을 넘친다. 붐빌 일도 없으니 위에서 몇 개만.
+    constexpr std::size_t MAX_LISTED_ROOMS = 4;
 }
 
 bool CoopPopup::init() {
-    if (!Popup::init(340.f, 250.f)) return false;
+    if (!Popup::init(360.f, 290.f)) return false;
 
     this->setTitle("COOP ROOM");
 
-    // 서버 주소
-    auto serverLabel = CCLabelBMFont::create("SERVER ADDRESS", "bigFont.fnt");
-    serverLabel->setScale(0.35f);
-    m_mainLayer->addChildAtPosition(serverLabel, Anchor::Top, ccp(0.f, -42.f));
-
-    // 기호를 허용하지 않으면 주소의 : / . 이 입력되지 않는다.
-    // 기본 글꼴은 기호 글리프가 부족해 화면에도 제대로 안 나오므로 채팅 글꼴을 쓴다.
-    m_serverInput = TextInput::create(280.f, "wss://example.onrender.com", "chatFont.fnt");
-    m_serverInput->setCommonFilter(CommonFilter::Any);
-    m_serverInput->setString(Mod::get()->getSettingValue<std::string>("server-url"));
-    m_mainLayer->addChildAtPosition(m_serverInput, Anchor::Top, ccp(0.f, -66.f));
-
-    // 방 이름
+    // --- 방 이름 ---
     auto roomLabel = CCLabelBMFont::create("ROOM NAME", "bigFont.fnt");
     roomLabel->setScale(0.35f);
-    m_mainLayer->addChildAtPosition(roomLabel, Anchor::Top, ccp(0.f, -100.f));
+    m_mainLayer->addChildAtPosition(roomLabel, Anchor::Top, ccp(0.f, -40.f));
 
-    m_roomInput = TextInput::create(280.f, "room name", "chatFont.fnt");
+    m_roomInput = TextInput::create(300.f, "room name", "chatFont.fnt");
     m_roomInput->setCommonFilter(CommonFilter::Any);
-    m_roomInput->setString(Mod::get()->getSettingValue<std::string>("room-name"));
-    m_mainLayer->addChildAtPosition(m_roomInput, Anchor::Top, ccp(0.f, -124.f));
+    m_roomInput->setString(coop::currentRoom());
+    m_mainLayer->addChildAtPosition(m_roomInput, Anchor::Top, ccp(0.f, -62.f));
 
-    // 버튼들.
-    // 자리 계산은 직접 하지 않고 레이아웃에 맡긴다. CCMenu는 기본적으로
-    // 기준점을 무시하고 자식을 배치하는데, setLayout을 부르면 Geode가 그 설정을
-    // 꺼주기 때문에 좌표가 상식적으로 동작한다.
-    auto menu = CCMenu::create();
-    menu->setContentSize({ 300.f, 40.f });
+    // --- 내 방 / 참여 ---
+    auto actions = CCMenu::create();
+    actions->setContentSize({ 300.f, 34.f });
 
-    menu->addChild(CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("New Room", "bigFont.fnt", "GJ_button_05.png", 0.7f),
-        [this](CCMenuItemSpriteExtra*) { this->onRandomRoom(nullptr); }
+    actions->addChild(CCMenuItemExt::createSpriteExtra(
+        ButtonSprite::create("My Room", "bigFont.fnt", "GJ_button_05.png", 0.6f),
+        [this](CCMenuItemSpriteExtra*) { this->onMyRoom(nullptr); }
     ));
-    menu->addChild(CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("Join", "bigFont.fnt", "GJ_button_01.png", 0.7f),
+    actions->addChild(CCMenuItemExt::createSpriteExtra(
+        ButtonSprite::create("Join", "bigFont.fnt", "GJ_button_01.png", 0.6f),
         [this](CCMenuItemSpriteExtra*) { this->onJoin(nullptr); }
     ));
 
-    menu->setLayout(RowLayout::create()->setGap(20.f));
-    m_mainLayer->addChildAtPosition(menu, Anchor::Bottom, ccp(0.f, 62.f));
+    actions->setLayout(RowLayout::create()->setGap(20.f));
+    m_mainLayer->addChildAtPosition(actions, Anchor::Top, ccp(0.f, -92.f));
 
-    // 이미 만들어둔 레벨을 방에 올리는 버튼.
+    // --- 열려 있는 방 목록 ---
+    // 이름을 직접 치지 않고 눌러서 바로 들어갈 수 있도록.
+    auto listLabel = CCLabelBMFont::create("OPEN ROOMS", "bigFont.fnt");
+    listLabel->setScale(0.35f);
+    m_mainLayer->addChildAtPosition(listLabel, Anchor::Top, ccp(0.f, -118.f));
+
+    m_roomListMenu = CCMenu::create();
+    m_roomListMenu->setContentSize({ 320.f, 92.f });
+    m_roomListMenu->setLayout(ColumnLayout::create()->setGap(4.f));
+    m_mainLayer->addChildAtPosition(m_roomListMenu, Anchor::Top, ccp(0.f, -168.f));
+
+    m_emptyLabel = CCLabelBMFont::create("Looking for rooms...", "chatFont.fnt");
+    m_emptyLabel->setScale(0.5f);
+    m_emptyLabel->setOpacity(150);
+    m_mainLayer->addChildAtPosition(m_emptyLabel, Anchor::Top, ccp(0.f, -168.f));
+
+    // --- 내 레벨 공유 ---
     // 자동으로 올리지 않는 이유는 둘 다 같은 레벨을 열었을 때 오브젝트가
     // 두 배로 늘어나기 때문이다. 그래서 올릴지 말지는 사용자가 정한다.
     auto shareMenu = CCMenu::create();
     shareMenu->setContentSize({ 300.f, 30.f });
-
     shareMenu->addChild(CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("Share My Level", "bigFont.fnt", "GJ_button_04.png", 0.6f),
+        ButtonSprite::create("Share My Level", "bigFont.fnt", "GJ_button_04.png", 0.55f),
         [this](CCMenuItemSpriteExtra*) { this->onShareLevel(nullptr); }
     ));
-
     shareMenu->setLayout(RowLayout::create());
-    m_mainLayer->addChildAtPosition(shareMenu, Anchor::Bottom, ccp(0.f, 34.f));
+    m_mainLayer->addChildAtPosition(shareMenu, Anchor::Bottom, ccp(0.f, 40.f));
 
-    // 접속 상태
-    m_statusLabel = CCLabelBMFont::create("", "bigFont.fnt");
-    m_statusLabel->setScale(0.35f);
-    m_mainLayer->addChildAtPosition(m_statusLabel, Anchor::Bottom, ccp(0.f, 14.f));
+    // --- 접속 상태 ---
+    m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
+    m_statusLabel->setScale(0.5f);
+    m_mainLayer->addChildAtPosition(m_statusLabel, Anchor::Bottom, ccp(0.f, 16.f));
 
-    this->updateStatus(0.f);
-    this->schedule(schedule_selector(CoopPopup::updateStatus), 0.25f);
+    coop::requestRoomList();
+    this->tick(0.f);
+    this->schedule(schedule_selector(CoopPopup::tick), 1.f);
     return true;
 }
 
-void CoopPopup::updateStatus(float) {
-    if (!m_statusLabel) return;
+void CoopPopup::rebuildRoomList() {
+    if (!m_roomListMenu) return;
 
-    switch (coop::state()) {
-        case coop::State::Connected: {
-            auto peers = coop::peerCount();
-            m_statusLabel->setString(
-                fmt::format("Connected - {} partner(s) in room", peers).c_str()
-            );
-            m_statusLabel->setColor(peers > 0 ? ccColor3B{ 90, 255, 90 } : ccColor3B{ 255, 220, 90 });
-            break;
-        }
-        case coop::State::Connecting: {
-            // 실패 이유가 있으면 그대로 보여준다. "연결 중"만 계속 떠 있으면
-            // 서버가 꺼진 건지 주소가 틀린 건지 알 방법이 없다.
-            auto error = coop::lastError();
-            if (error.empty()) {
-                m_statusLabel->setString("Connecting...");
-            } else {
-                m_statusLabel->setString(error.c_str());
+    auto rooms = coop::roomList();
+    auto here = coop::currentRoom();
+
+    // 내용이 그대로면 다시 만들지 않는다. 누르는 도중에 버튼이 사라지면 곤란하다.
+    std::string signature;
+    for (auto const& room : rooms) {
+        signature += fmt::format("{}:{};", room.name, room.count);
+    }
+    if (signature == m_shownRooms) return;
+    m_shownRooms = signature;
+
+    m_roomListMenu->removeAllChildren();
+
+    std::size_t shown = 0;
+    for (auto const& room : rooms) {
+        if (shown >= MAX_LISTED_ROOMS) break;
+        if (room.name == here) continue;  // 이미 있는 방은 띄울 필요가 없다
+
+        auto caption = fmt::format("{} ({})", room.name, room.count);
+        auto sprite = ButtonSprite::create(caption.c_str(), "bigFont.fnt", "GJ_button_02.png", 0.5f);
+
+        auto name = room.name;
+        m_roomListMenu->addChild(CCMenuItemExt::createSpriteExtra(
+            sprite,
+            [this, name](CCMenuItemSpriteExtra*) {
+                m_roomInput->setString(name);
+                coop::joinRoom(name);
+                Notification::create(
+                    fmt::format("Joining \"{}\"", name), NotificationIcon::Info
+                )->show();
             }
-            m_statusLabel->setColor({ 255, 220, 90 });
-            break;
-        }
-        case coop::State::Disconnected:
-            m_statusLabel->setString("Not connected - enter an address");
-            m_statusLabel->setColor({ 255, 110, 110 });
-            break;
+        ));
+        ++shown;
+    }
+
+    m_roomListMenu->updateLayout();
+
+    if (m_emptyLabel) {
+        m_emptyLabel->setVisible(shown == 0);
+        m_emptyLabel->setString(
+            coop::state() == coop::State::Connected ? "No other rooms open" : "Connecting..."
+        );
     }
 }
 
-void CoopPopup::onRandomRoom(CCMenuItemSpriteExtra*) {
-    m_roomInput->setString(randomRoomName());
+void CoopPopup::tick(float) {
+    if (m_statusLabel) {
+        switch (coop::state()) {
+            case coop::State::Connected: {
+                auto peers = coop::peerCount();
+                m_statusLabel->setString(
+                    fmt::format("In \"{}\" - {} partner(s)", coop::currentRoom(), peers).c_str()
+                );
+                m_statusLabel->setColor(peers > 0 ? ccColor3B{ 90, 255, 90 } : ccColor3B{ 255, 220, 90 });
+                break;
+            }
+            case coop::State::Connecting: {
+                auto error = coop::lastError();
+                m_statusLabel->setString(error.empty() ? "Connecting..." : error.c_str());
+                m_statusLabel->setColor({ 255, 220, 90 });
+                break;
+            }
+            case coop::State::Disconnected:
+                m_statusLabel->setString("Not connected");
+                m_statusLabel->setColor({ 255, 110, 110 });
+                break;
+        }
+    }
+
+    coop::requestRoomList();
+    this->rebuildRoomList();
+}
+
+void CoopPopup::onMyRoom(CCMenuItemSpriteExtra*) {
+    auto mine = coop::defaultRoomName();
+    m_roomInput->setString(mine);
+    coop::joinRoom(mine);
+    Notification::create("Back to your own room", NotificationIcon::Info)->show();
+}
+
+void CoopPopup::onJoin(CCMenuItemSpriteExtra*) {
+    auto room = std::string(m_roomInput->getString());
+    if (room.empty()) {
+        room = coop::defaultRoomName();
+        m_roomInput->setString(room);
+    }
+
+    coop::joinRoom(room);
+    Notification::create(fmt::format("Joining \"{}\"", room), NotificationIcon::Info)->show();
 }
 
 void CoopPopup::onShareLevel(CCMenuItemSpriteExtra*) {
@@ -145,23 +185,6 @@ void CoopPopup::onShareLevel(CCMenuItemSpriteExtra*) {
     Notification::create(
         fmt::format("Sharing {} object(s) with the room", count), NotificationIcon::Success
     )->show();
-}
-
-void CoopPopup::onJoin(CCMenuItemSpriteExtra*) {
-    auto server = std::string(m_serverInput->getString());
-    auto room = std::string(m_roomInput->getString());
-
-    if (room.empty()) {
-        Notification::create("Enter a room name", NotificationIcon::Warning)->show();
-        return;
-    }
-
-    // 설정에 저장해두면 다음에 게임을 켜도 그대로 이어진다.
-    Mod::get()->setSettingValue<std::string>("server-url", server);
-    Mod::get()->setSettingValue<std::string>("room-name", room);
-
-    coop::connect();
-    Notification::create(fmt::format("Joining \"{}\"", room), NotificationIcon::Info)->show();
 }
 
 CoopPopup* CoopPopup::create() {
