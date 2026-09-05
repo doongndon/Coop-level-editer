@@ -21,10 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clear CPM cache
+      - name: Clean all build artifacts and caches
         shell: bash
         run: |
-          rm -rf cpm-cache || true
+          rm -rf cpm-cache
+          rm -rf build
+          rm -rf .sccache
+          rm -rf CMakeFiles
+          rm -f CMakeCache.txt
+        continue-on-error: true
 
       - name: Use older, compatible Android NDK
         if: runner.os == 'Linux'
@@ -33,13 +38,30 @@ jobs:
           ndk-version: r27c
           add-to-path: true
 
+      - name: Create build directory
+        shell: bash
+        run: mkdir -p build
+
       - name: Build mod
         uses: geode-sdk/build-geode-mod@main
         with:
           target: ${{ matrix.target }}
+        env:
+          CMAKE_SUPPRESS_DEVELOPER_WARNINGS: "ON"
 
       - name: Upload result
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: coop-mod-${{ matrix.target }}
           path: build/*.geode
+
+      - name: Debug on failure
+        if: failure()
+        shell: bash
+        run: |
+          find . -name "CMakeError.log" -o -name "CMakeOutput.log" 2>/dev/null | while read f; do
+            echo "File: $f"
+            head -50 "$f"
+          done
+          ls -la cpm-cache/ 2>/dev/null || echo "No cpm-cache"
