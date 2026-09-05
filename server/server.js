@@ -105,12 +105,18 @@ wss.on("connection", client => {
                 if (typeof msg.uid !== "string" || typeof msg.data !== "string") return;
                 room.objects.set(msg.uid, msg.data);
                 relay(room, client, { type: msg.type, uid: msg.uid, data: msg.data });
+                // 혼자 테스트할 때도 모드가 실제로 보내고 있는지 눈으로 확인할 수 있도록 남긴다.
+                console.log(
+                    `[${msg.type === "add" ? "생성" : "수정"}] ${msg.uid} -> ${msg.data.slice(0, 40)}`
+                    + ` (방 오브젝트 ${room.objects.size}개)`
+                );
                 return;
 
             case "remove":
                 if (typeof msg.uid !== "string") return;
                 room.objects.delete(msg.uid);
                 relay(room, client, { type: "remove", uid: msg.uid });
+                console.log(`[삭제] ${msg.uid} (방 오브젝트 ${room.objects.size}개)`);
                 return;
         }
     });
