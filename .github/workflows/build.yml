@@ -33,10 +33,19 @@ jobs:
 
       - name: Use older, compatible Android NDK
         if: runner.os == 'Linux'
+        id: setup-ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
           add-to-path: true
+
+      - name: Point geode-sdk build action at the r27c NDK
+        # geode-sdk/build-geode-mod은 android-ndk-version 입력이 없으면
+        # $ANDROID_NDK_LATEST_HOME(러너에 기본 설치된 최신 NDK)을 그대로 써버려서,
+        # 위에서 설치한 r27c가 무시되고 있었음. 환경변수를 직접 덮어써서 강제 적용.
+        if: runner.os == 'Linux'
+        shell: bash
+        run: echo "ANDROID_NDK_LATEST_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
 
       - name: Create build directory
         shell: bash
