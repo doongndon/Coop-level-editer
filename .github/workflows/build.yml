@@ -22,8 +22,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Clear CPM cache
-        run: rm -rf cpm-cache
         shell: bash
+        run: |
+          rm -rf cpm-cache || true
 
       - name: Use older, compatible Android NDK
         if: runner.os == 'Linux'
