@@ -68,6 +68,15 @@ namespace {
         return std::string(object->getSaveString(editor));
     }
 
+    // 아직 레벨 안에 있는 오브젝트인지.
+    //
+    // 우리는 오브젝트를 Ref로 붙잡고 있어서 게임이 레벨에서 빼내도 사라지지 않는다.
+    // 그래서 "살아 있다"와 "레벨에 있다"가 다르다. 이미 빠진 것을 다시 지우라고
+    // 시키면 게임이 없는 자리를 뒤지다 죽는다. 지우기 전에 반드시 확인해야 한다.
+    bool isInLevel(GameObject* object) {
+        return object && object->getParent();
+    }
+
     void forget(std::string const& uid) {
         if (auto it = g_objectByUid.find(uid); it != g_objectByUid.end()) {
             if (auto object = it->second.data()) {
@@ -160,7 +169,7 @@ namespace {
             if (previous == data) return;
 
             cocos2d::CCPoint moved;
-            if (onlyPositionChanged(previous, data, moved)) {
+            if (isInLevel(object) && onlyPositionChanged(previous, data, moved)) {
                 // 옮기기만 한 경우. 통째로 다시 만들면 상대가 끄는 동안 깜빡이고
                 // 내가 그 오브젝트를 선택 중이었으면 선택이 풀린다.
                 object->setPosition(moved);
@@ -170,7 +179,9 @@ namespace {
             }
 
             forget(uid);
-            editor->removeObject(object, true);
+            if (isInLevel(object)) {
+                editor->removeObject(object, true);
+            }
         }
 
         auto object = spawnFromSaveString(editor, data);
@@ -188,7 +199,9 @@ namespace {
         // 지우는 동안 살아 있도록 먼저 붙잡아둔다.
         Ref<GameObject> object = it->second;
         forget(uid);
-        if (object) editor->removeObject(object, true);
+        if (isInLevel(object)) {
+            editor->removeObject(object, true);
+        }
     }
 
     // 아직 모르는 오브젝트다. uid를 붙이고 서버에 알린다.
@@ -220,9 +233,8 @@ namespace {
 
     // 이 오브젝트를 한 번 살펴본다.
     void inspect(LevelEditorLayer* editor, GameObject* object) {
-        if (!object) return;
         // 이미 레벨에서 떨어져 나간 오브젝트는 읽지 않는다.
-        if (!object->getParent()) return;
+        if (!isInLevel(object)) return;
 
         auto known = g_uidByLocalId.find(object->m_uniqueID);
         if (known == g_uidByLocalId.end()) {
