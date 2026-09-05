@@ -17,6 +17,7 @@ protected:
     void updateStatus(float);
     void onJoin(CCMenuItemSpriteExtra*);
     void onRandomRoom(CCMenuItemSpriteExtra*);
+    void onShareLevel(CCMenuItemSpriteExtra*);
 
 public:
     static CoopPopup* create();

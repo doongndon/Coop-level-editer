@@ -30,7 +30,7 @@ namespace {
 }
 
 bool CoopPopup::init() {
-    if (!Popup::init(320.f, 220.f)) return false;
+    if (!Popup::init(340.f, 250.f)) return false;
 
     this->setTitle("COOP ROOM");
 
@@ -39,38 +39,55 @@ bool CoopPopup::init() {
     serverLabel->setScale(0.35f);
     m_mainLayer->addChildAtPosition(serverLabel, Anchor::Top, ccp(0.f, -42.f));
 
-    m_serverInput = TextInput::create(270.f, "ws://192.168.0.10:8787");
+    m_serverInput = TextInput::create(280.f, "ws://192.168.0.10:8787");
     m_serverInput->setString(Mod::get()->getSettingValue<std::string>("server-url"));
     m_mainLayer->addChildAtPosition(m_serverInput, Anchor::Top, ccp(0.f, -66.f));
 
     // 방 이름
     auto roomLabel = CCLabelBMFont::create("ROOM NAME", "bigFont.fnt");
     roomLabel->setScale(0.35f);
-    m_mainLayer->addChildAtPosition(roomLabel, Anchor::Center, ccp(0.f, 4.f));
+    m_mainLayer->addChildAtPosition(roomLabel, Anchor::Top, ccp(0.f, -100.f));
 
-    m_roomInput = TextInput::create(270.f, "room name");
+    m_roomInput = TextInput::create(280.f, "room name");
     m_roomInput->setString(Mod::get()->getSettingValue<std::string>("room-name"));
-    m_mainLayer->addChildAtPosition(m_roomInput, Anchor::Center, ccp(0.f, -20.f));
+    m_mainLayer->addChildAtPosition(m_roomInput, Anchor::Top, ccp(0.f, -124.f));
 
-    // 버튼 두 개
+    // 버튼들.
+    // CCMenu는 기준점이 한가운데라, 자식 좌표는 메뉴 자신의 상자 안(0~너비) 기준이고
+    // 메뉴 자체는 가운데가 지정한 자리에 오도록 놓인다.
     auto menu = CCMenu::create();
-    menu->setContentSize({ 280.f, 40.f });
+    menu->setContentSize({ 300.f, 40.f });
 
     auto randomBtn = CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("New Room", "bigFont.fnt", "GJ_button_05.png", 0.7f),
         [this](CCMenuItemSpriteExtra*) { this->onRandomRoom(nullptr); }
     );
-    randomBtn->setPosition({ 75.f, 20.f });
+    randomBtn->setPosition({ 85.f, 20.f });
     menu->addChild(randomBtn);
 
     auto joinBtn = CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("Join", "bigFont.fnt", "GJ_button_01.png", 0.7f),
         [this](CCMenuItemSpriteExtra*) { this->onJoin(nullptr); }
     );
-    joinBtn->setPosition({ 205.f, 20.f });
+    joinBtn->setPosition({ 215.f, 20.f });
     menu->addChild(joinBtn);
 
-    m_mainLayer->addChildAtPosition(menu, Anchor::Bottom, ccp(-140.f, 34.f));
+    m_mainLayer->addChildAtPosition(menu, Anchor::Bottom, ccp(0.f, 62.f));
+
+    // 이미 만들어둔 레벨을 방에 올리는 버튼.
+    // 자동으로 올리지 않는 이유는 둘 다 같은 레벨을 열었을 때 오브젝트가
+    // 두 배로 늘어나기 때문이다. 그래서 올릴지 말지는 사용자가 정한다.
+    auto shareMenu = CCMenu::create();
+    shareMenu->setContentSize({ 300.f, 30.f });
+
+    auto shareBtn = CCMenuItemExt::createSpriteExtra(
+        ButtonSprite::create("Share My Level", "bigFont.fnt", "GJ_button_04.png", 0.6f),
+        [this](CCMenuItemSpriteExtra*) { this->onShareLevel(nullptr); }
+    );
+    shareBtn->setPosition({ 150.f, 15.f });
+    shareMenu->addChild(shareBtn);
+
+    m_mainLayer->addChildAtPosition(shareMenu, Anchor::Bottom, ccp(0.f, 34.f));
 
     // 접속 상태
     m_statusLabel = CCLabelBMFont::create("", "bigFont.fnt");
@@ -107,6 +124,19 @@ void CoopPopup::updateStatus(float) {
 
 void CoopPopup::onRandomRoom(CCMenuItemSpriteExtra*) {
     m_roomInput->setString(randomRoomName());
+}
+
+void CoopPopup::onShareLevel(CCMenuItemSpriteExtra*) {
+    auto count = coop::unsharedCount();
+    if (count == 0) {
+        Notification::create("Nothing new to share", NotificationIcon::Info)->show();
+        return;
+    }
+
+    coop::shareExistingLevel();
+    Notification::create(
+        fmt::format("Sharing {} object(s) with the room", count), NotificationIcon::Success
+    )->show();
 }
 
 void CoopPopup::onJoin(CCMenuItemSpriteExtra*) {

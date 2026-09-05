@@ -78,24 +78,26 @@ class $modify(CoopEditorUI, EditorUI) {
     }
 
     void coopTick(float) {
-        // 선택 중인 오브젝트가 바뀌었는지 살펴서 바뀐 것만 보낸다.
-        // 옮기기, 회전, 크기 조절, 색상 변경이 모두 여기서 잡힌다.
+        // 선택 중인 것부터 본다. 편집 중인 오브젝트라 가장 먼저 전해져야 한다.
         coop::syncSelection(this->getSelectedObjects());
+        // 그다음 레벨 전체를 조금씩 나눠 훑는다. 되돌리기처럼 어떤 경로로 바뀌었든
+        // 결과적으로 달라진 것이 있으면 여기서 잡힌다.
+        coop::reconcile();
         this->updateCoopStatus();
     }
 
     GameObject* createObject(int objectID, CCPoint position) {
         auto object = EditorUI::createObject(objectID, position);
-        coop::trackNewObject(object);
+        coop::noticeObject(object);
         return object;
     }
 
     CCArray* pasteObjects(gd::string str, bool withColor, bool noUndo) {
         auto created = EditorUI::pasteObjects(str, withColor, noUndo);
 
-        if (created && !coop::isApplyingRemote()) {
+        if (created) {
             for (unsigned int i = 0; i < created->count(); ++i) {
-                coop::trackNewObject(static_cast<GameObject*>(created->objectAtIndex(i)));
+                coop::noticeObject(static_cast<GameObject*>(created->objectAtIndex(i)));
             }
         }
         return created;
