@@ -64,17 +64,14 @@ bool CoopPopup::init() {
     m_emptyLabel->setOpacity(150);
     m_mainLayer->addChildAtPosition(m_emptyLabel, Anchor::Top, ccp(0.f, -172.f));
 
-    // --- 내 레벨 공유 ---
-    // 자동으로 올리지 않는 이유는 둘 다 같은 레벨을 열었을 때 오브젝트가
-    // 두 배로 늘어나기 때문이다. 그래서 올릴지 말지는 사용자가 정한다.
-    auto shareMenu = CCMenu::create();
-    shareMenu->setContentSize({ 300.f, 30.f });
-    shareMenu->addChild(CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("Share My Level", "bigFont.fnt", "GJ_button_04.png", 0.55f),
-        [this](CCMenuItemSpriteExtra*) { this->onShareLevel(nullptr); }
-    ));
-    shareMenu->setLayout(RowLayout::create());
-    m_mainLayer->addChildAtPosition(shareMenu, Anchor::Bottom, ccp(0.f, 40.f));
+    // 방을 만들면 내 레벨이 원본이 되고, 남의 방에 들어가면 그 레벨을 받는다.
+    // 따로 "공유하기"를 누를 일이 없어졌다.
+    auto hint = CCLabelBMFont::create(
+        "Create = share your level  |  Join = load theirs", "chatFont.fnt"
+    );
+    hint->setScale(0.42f);
+    hint->setOpacity(140);
+    m_mainLayer->addChildAtPosition(hint, Anchor::Bottom, ccp(0.f, 38.f));
 
     // --- 접속 상태 ---
     m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
@@ -122,8 +119,7 @@ void CoopPopup::rebuildRoomList() {
             sprite,
             [this, name, mine](CCMenuItemSpriteExtra*) {
                 if (mine) return;  // 이미 있는 방을 다시 누르면 아무 일도 없어야 한다
-                m_roomInput->setString(name);
-                coop::joinRoom(name);
+                this->askJoin(name);
             }
         ));
         ++shown;
@@ -201,22 +197,21 @@ void CoopPopup::onLeave(CCMenuItemSpriteExtra*) {
     coop::leaveRoom();
 }
 
-void CoopPopup::onShareLevel(CCMenuItemSpriteExtra*) {
-    if (!coop::inRoom()) {
-        Notification::create("Join a room first", NotificationIcon::Warning)->show();
-        return;
-    }
-
-    auto count = coop::unsharedCount();
-    if (count == 0) {
-        Notification::create("Nothing new to share", NotificationIcon::Info)->show();
-        return;
-    }
-
-    coop::shareExistingLevel();
-    Notification::create(
-        fmt::format("Sharing {} object(s) with the room", count), NotificationIcon::Success
-    )->show();
+// 남의 방에 들어가면 지금 편집 중인 레벨은 그 방의 레벨로 바뀐다.
+// 되돌릴 수 없는 일이라 반드시 먼저 물어본다.
+void CoopPopup::askJoin(std::string const& name) {
+    geode::createQuickPopup(
+        "Join Room",
+        fmt::format(
+            "Joining <cy>{}</c> replaces the level you have open with that room's level.\n"
+            "Your current level will be <cr>cleared</c>.\n\nContinue?",
+            name
+        ),
+        "Cancel", "Join",
+        [name](FLAlertLayer*, bool joined) {
+            if (joined) coop::joinRoom(name);
+        }
+    );
 }
 
 CoopPopup* CoopPopup::create() {

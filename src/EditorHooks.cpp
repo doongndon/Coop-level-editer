@@ -48,10 +48,17 @@ class $modify(CoopEditorUI, EditorUI) {
         m_fields->m_menu = menu;
 
         coop::clearCursors();
+
+        // 에디터에 들어올 때는 항상 방 밖에서 시작한다.
+        //
+        // 한 레벨에서 같이 작업하는 구조라, 방에 들어가는 순간 내 레벨이
+        // 그 방의 레벨로 바뀐다. 그런 일이 레벨을 열자마자 저절로 일어나면
+        // 방금 연 레벨이 소리 없이 사라진다. 방은 사용자가 직접 고르게 한다.
+        if (coop::inRoom()) coop::leaveRoom();
         coop::enterEditor();
 
-        // 설정에서 꺼두지 않았으면 에디터에 들어올 때 서버에 알아서 접속한다.
-        // 접속만 할 뿐 방에는 들어가지 않는다. 방은 사용자가 고른다.
+        // 설정에서 꺼두지 않았으면 서버에는 알아서 접속한다.
+        // 접속만 할 뿐 방에는 들어가지 않는다.
         if (Mod::get()->getSettingValue<bool>("auto-join")
             && coop::state() == coop::State::Disconnected) {
             coop::connect();

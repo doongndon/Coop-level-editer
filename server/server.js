@@ -103,6 +103,9 @@ function leaveRoom(client, announce = true) {
     }
 }
 
+// 한 레벨에서 같이 작업하는 구조라 들어오는 사람의 역할이 갈린다.
+// - host: 방이 비어 있다. 이 사람의 레벨이 이 방의 원본이 된다.
+// - guest: 방에 이미 레벨이 있다. 이 사람은 그것을 받아서 쓴다.
 function enterRoom(client, room) {
     leaveRoom(client);
 
@@ -110,12 +113,21 @@ function enterRoom(client, room) {
     room.clients.add(client);
     room.emptySince = 0;
 
-    console.log(`[입장] 방 "${room.name}" - ${client.playerName} (현재 ${room.clients.size}명)`);
+    const host = room.objects.size === 0 && !room.settings;
+    console.log(
+        `[입장] 방 "${room.name}" - ${client.playerName}`
+        + ` (${host ? "방장" : "손님"}, 현재 ${room.clients.size}명)`
+    );
 
-    // 어느 방에 들어갔는지 먼저 확실히 알려준다. 모드는 이 답을 받고 나서야
-    // 자기가 방 안에 있다고 판단한다.
-    sendTo(client, { type: "room", name: room.name });
-    sendState(room, client);
+    // 어느 방에 어떤 역할로 들어갔는지 먼저 확실히 알려준다.
+    // 모드는 이 답을 받고 나서야 자기 레벨을 올릴지 비울지 정한다.
+    sendTo(client, { type: "room", name: room.name, mode: host ? "host" : "guest" });
+
+    if (!host) {
+        if (room.settings) sendTo(client, room.settings);
+        sendState(room, client);
+    }
+
     announcePeers(room);
     relay(room, client, { type: "joined", name: client.playerName });
 }
@@ -135,7 +147,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v3 (explicit rooms)";
+const SERVER_VERSION = "v4 (one shared level)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -197,6 +209,8 @@ wss.on("connection", client => {
                 name,
                 clients: new Set(),
                 objects: new Map(),
+                // 배경, 바닥, 색깔, 노래. 레벨에 하나뿐인 값이라 통째로 보관한다.
+                settings: null,
                 owner: client.playerName,
                 createdAt: Date.now(),
                 emptySince: 0,
@@ -252,6 +266,18 @@ wss.on("connection", client => {
                     x: msg.x,
                     y: msg.y,
                 });
+                return;
+
+            // 레벨 설정은 하나뿐이라 덮어쓰고 그대로 전달한다.
+            case "settings":
+                if (typeof msg.data !== "string" || msg.data === "") return;
+                room.settings = {
+                    type: "settings",
+                    data: msg.data,
+                    song: typeof msg.song === "number" ? msg.song : 0,
+                    track: typeof msg.track === "number" ? msg.track : 0,
+                };
+                relay(room, client, room.settings);
                 return;
 
             case "add":

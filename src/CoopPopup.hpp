@@ -29,7 +29,8 @@ protected:
 
     void onCreate(CCMenuItemSpriteExtra*);
     void onLeave(CCMenuItemSpriteExtra*);
-    void onShareLevel(CCMenuItemSpriteExtra*);
+    // 들어가면 내 레벨이 지워지므로 먼저 물어본다.
+    void askJoin(std::string const& name);
 
 public:
     static CoopPopup* create();

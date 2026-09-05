@@ -179,12 +179,23 @@ namespace {
                 // 여기서 비우지 않으면 옛 uid가 새 방에 섞여 들어가 꼬인다.
                 coop::enterEditor();
 
+                // 한 레벨에서 같이 작업하므로 어느 레벨이 원본인지 정해야 한다.
+                // 방이 비어 있으면 내 레벨이 원본이 되고(host),
+                // 이미 레벨이 있으면 내 것을 비우고 그것을 받는다(guest).
+                auto mode = value["mode"].asString().unwrapOr("");
+                std::string note;
+                if (mode == "host") {
+                    coop::uploadWholeLevel();
+                    note = fmt::format("Sharing your level in \"{}\"", name);
+                } else if (mode == "guest") {
+                    coop::clearLevel();
+                    note = fmt::format("Loading the level from \"{}\"", name);
+                } else {
+                    note = "Left the room";
+                }
+
                 if (Mod::get()->getSettingValue<bool>("show-notifications")) {
-                    Notification::create(
-                        name.empty() ? std::string("Left the room")
-                                     : fmt::format("You are in \"{}\"", name),
-                        NotificationIcon::Success
-                    )->show();
+                    Notification::create(note, NotificationIcon::Success)->show();
                 }
                 return;
             }

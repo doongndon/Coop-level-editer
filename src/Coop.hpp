@@ -82,11 +82,23 @@ namespace coop {
     // 돌아오기를 기다리지 않도록 하기 위한 지름길.
     void noticeObject(GameObject* object);
 
-    // 에디터에 들어올 때부터 레벨에 있던 오브젝트들을 방에 올린다.
-    // 기본적으로는 올리지 않는다. 양쪽이 같은 레벨을 열었을 때 두 배가 되기 때문.
-    void shareExistingLevel();
-    // 아직 방에 올리지 않은 기존 오브젝트가 몇 개인지.
-    int unsharedCount();
+    // 방장이 될 때: 지금 레벨에 있는 것을 전부 방에 올린다.
+    void uploadWholeLevel();
+    // 손님이 될 때: 내 레벨을 비운다. 방의 레벨을 그대로 받기 위해서다.
+    void clearLevel();
+
+    // --- 레벨 설정 (LevelState.cpp) ---
+    //
+    // 배경, 바닥, 색깔, 노래, 게임 모드 같은 것. 오브젝트와 달리 레벨 전체에
+    // 하나씩만 있는 값이라 문자열 하나로 통째로 주고받는다.
+    std::string levelSettingsString();
+    int levelSongID();
+    int levelAudioTrack();
+    void applyLevelSettings(std::string const& data, int songID, int audioTrack);
+    // 설정이 달라졌으면 방에 알린다. 주기적으로 부른다.
+    void syncLevelSettings();
+    // 방이나 레벨이 바뀌었다. 다음 설정은 같은 내용이라도 화면에 다시 반영한다.
+    void forgetAppliedSettings();
 
     // 서버에서 받은 내용을 적용하는 중인지. 적용 중에는 되돌려 보내지 않는다.
     bool isApplyingRemote();
