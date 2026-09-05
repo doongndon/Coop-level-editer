@@ -1,0 +1,27 @@
+{
+    "geode": "3.0.0",
+    "gd": {
+        "win": "2.206",
+        "android": "2.206"
+    },
+    "version": "v0.1.0",
+    "id": "com.yourname.coopedit",
+    "name": "Coop Level Editor",
+    "developer": "yourname",
+    "description": "Edit levels together in real time",
+    "dependencies": [],
+    "settings": {
+        "server-url": {
+            "name": "Server Address",
+            "description": "Enter a wss:// address",
+            "type": "string",
+            "default": "ws://YOUR_SERVER_ADDRESS:8787"
+        },
+        "room-name": {
+            "name": "Room Name",
+            "description": "Use the same name as your partner",
+            "type": "string",
+            "default": "test-room"
+        }
+    }
+}
