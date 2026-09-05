@@ -19,7 +19,12 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CPM.cmake)
     )
 endif()
 include(${CMAKE_BINARY_DIR}/CPM.cmake)
-CPMAddPackage("gh:machinezone/IXWebSocket#v11.4.5")
+CPMAddPackage(
+    NAME IXWebSocket
+    GITHUB_REPOSITORY machinezone/IXWebSocket
+    GIT_TAG v11.4.5
+    OPTIONS "USE_ZLIB OFF"
+)
 target_link_libraries(${PROJECT_NAME} ixwebsocket)
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
