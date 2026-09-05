@@ -4,8 +4,11 @@
 // - 같은 방에 있는 사람끼리 오브젝트 변경 내용을 전달한다.
 // - 방의 현재 오브젝트 상태를 들고 있다가, 나중에 들어온 사람에게 통째로 보내준다.
 //   (이게 없으면 접속 전에 만들어둔 것이 상대에게 보이지 않는다.)
+const http = require("http");
 const { WebSocketServer } = require("ws");
 
+// 호스팅 업체는 포트를 자기가 정해서 알려준다. 알려주지 않으면(내 폰/PC에서 직접 실행)
+// 8787을 쓴다.
 const PORT = process.env.PORT || 8787;
 
 // 방 이름 -> { clients: Set, objects: Map<uid, 저장문자열> }
@@ -63,7 +66,15 @@ function leaveRoom(client) {
     }
 }
 
-const wss = new WebSocketServer({ port: PORT });
+// 호스팅 업체는 서버가 살아있는지 일반 접속으로 주기적으로 확인한다.
+// 웹소켓만 받고 아무 대답도 하지 않으면 죽은 줄 알고 내려버리므로,
+// 같은 포트에서 일반 접속에도 짧게 대답해준다.
+const httpServer = http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(`중계 서버 동작 중 - 방 ${rooms.size}개\n`);
+});
+
+const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", client => {
     client.roomName = null;
@@ -128,4 +139,7 @@ wss.on("connection", client => {
     });
 });
 
-console.log(`중계 서버 실행 중 - 포트 ${PORT}`);
+// 0.0.0.0으로 열어야 같은 와이파이의 다른 기기나 호스팅 업체가 접속할 수 있다.
+httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`중계 서버 실행 중 - 포트 ${PORT}`);
+});

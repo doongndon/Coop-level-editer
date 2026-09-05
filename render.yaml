@@ -1,0 +1,15 @@
+# Render에 올릴 때 쓰는 설정 파일.
+# 저장소를 연결하면 이 내용을 읽어 알아서 설정해준다.
+#
+# 이 파일이 인식되지 않으면 웹 화면에서 직접 다음과 같이 넣어도 된다.
+#   Root Directory : server
+#   Build Command  : npm install
+#   Start Command  : node server.js
+services:
+  - type: web
+    name: coop-level-editor-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
