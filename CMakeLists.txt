@@ -12,6 +12,9 @@ if (MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
 endif()
 
+# ✅ CPM: 로컬 캐시 무시하고 항상 새로 다운로드
+set(CPM_USE_LOCAL_PACKAGES OFF)
+
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CPM.cmake)
     file(DOWNLOAD
         https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/get_cpm.cmake
@@ -19,10 +22,12 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CPM.cmake)
     )
 endif()
 include(${CMAKE_BINARY_DIR}/CPM.cmake)
+
+# ✅ IXWebSocket v11.5.0 (CMake 3.21 호환)
 CPMAddPackage(
     NAME IXWebSocket
     GITHUB_REPOSITORY machinezone/IXWebSocket
-    GIT_TAG v11.4.5
+    GIT_TAG v11.5.0
     OPTIONS "USE_ZLIB OFF"
 )
 target_link_libraries(${PROJECT_NAME} ixwebsocket)
