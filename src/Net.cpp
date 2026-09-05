@@ -119,6 +119,12 @@ namespace coop {
             return;
         }
 
+        // 앞부분을 빼먹고 주소만 적는 경우가 흔해서 그대로 살려준다.
+        // 호스팅은 대부분 암호화 연결이므로 wss:// 로 본다.
+        if (url.find("://") == std::string::npos) {
+            url = "wss://" + url;
+        }
+
         g_state = State::Connecting;
         g_socket.setUrl(url);
 

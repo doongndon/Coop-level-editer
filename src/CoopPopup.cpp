@@ -39,7 +39,10 @@ bool CoopPopup::init() {
     serverLabel->setScale(0.35f);
     m_mainLayer->addChildAtPosition(serverLabel, Anchor::Top, ccp(0.f, -42.f));
 
-    m_serverInput = TextInput::create(280.f, "ws://192.168.0.10:8787");
+    // 기호를 허용하지 않으면 주소의 : / . 이 입력되지 않는다.
+    // 기본 글꼴은 기호 글리프가 부족해 화면에도 제대로 안 나오므로 채팅 글꼴을 쓴다.
+    m_serverInput = TextInput::create(280.f, "wss://example.onrender.com", "chatFont.fnt");
+    m_serverInput->setCommonFilter(CommonFilter::Any);
     m_serverInput->setString(Mod::get()->getSettingValue<std::string>("server-url"));
     m_mainLayer->addChildAtPosition(m_serverInput, Anchor::Top, ccp(0.f, -66.f));
 
@@ -48,7 +51,8 @@ bool CoopPopup::init() {
     roomLabel->setScale(0.35f);
     m_mainLayer->addChildAtPosition(roomLabel, Anchor::Top, ccp(0.f, -100.f));
 
-    m_roomInput = TextInput::create(280.f, "room name");
+    m_roomInput = TextInput::create(280.f, "room name", "chatFont.fnt");
+    m_roomInput->setCommonFilter(CommonFilter::Any);
     m_roomInput->setString(Mod::get()->getSettingValue<std::string>("room-name"));
     m_mainLayer->addChildAtPosition(m_roomInput, Anchor::Top, ccp(0.f, -124.f));
 
