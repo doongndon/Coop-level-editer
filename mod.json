@@ -12,7 +12,7 @@
     "settings": {
         "server-url": {
             "name": "Server Address",
-            "description": "Enter a wss:// address",
+            "description": "Enter a ws:// address (wss:// is not supported by this build)",
             "type": "string",
             "default": "ws://YOUR_SERVER_ADDRESS:8787"
         },

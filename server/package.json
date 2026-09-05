@@ -1,0 +1,13 @@
+{
+    "name": "coop-level-editor-server",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Relay server for the Coop Level Editor Geode mod",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "ws": "^8.18.0"
+    }
+}
