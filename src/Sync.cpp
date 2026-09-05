@@ -20,7 +20,11 @@ namespace {
     // GD가 붙인 오브젝트 번호(내 게임 안에서만 유효) -> 우리가 붙인 uid
     std::unordered_map<int, std::string> g_uidByLocalId;
     // 우리가 붙인 uid -> 실제 오브젝트
-    std::unordered_map<std::string, GameObject*> g_objectByUid;
+    //
+    // 날 포인터로 들고 있으면 게임이 오브젝트를 먼저 없앤 뒤 우리가 그걸 건드릴 때
+    // 크래시가 난다. GD의 오브젝트 번호는 삭제 후 재사용될 수도 있어서 대응표가
+    // 어긋날 여지도 있다. Ref로 들고 있으면 우리가 놓을 때까지 살아 있어 그런 일이 없다.
+    std::unordered_map<std::string, Ref<GameObject>> g_objectByUid;
     // 우리가 붙인 uid -> 마지막으로 서버와 맞춘 저장 문자열
     std::unordered_map<std::string, std::string> g_lastSaved;
 
@@ -57,7 +61,9 @@ namespace {
 
     void forget(std::string const& uid) {
         if (auto it = g_objectByUid.find(uid); it != g_objectByUid.end()) {
-            g_uidByLocalId.erase(it->second->m_uniqueID);
+            if (auto object = it->second.data()) {
+                g_uidByLocalId.erase(object->m_uniqueID);
+            }
             g_objectByUid.erase(it);
         }
         g_lastSaved.erase(uid);
@@ -138,7 +144,9 @@ namespace {
     // 서버가 알려준 오브젝트 상태를 내 레벨에 반영한다.
     void applyState(LevelEditorLayer* editor, std::string const& uid, std::string const& data) {
         if (auto it = g_objectByUid.find(uid); it != g_objectByUid.end()) {
-            auto object = it->second;
+            // forget()이 대응표에서 지우면 우리가 들고 있던 참조도 사라진다.
+            // 그 전에 여기서 따로 붙잡아두어야 아래에서 안전하게 지울 수 있다.
+            Ref<GameObject> object = it->second;
             auto previous = g_lastSaved[uid];
             if (previous == data) return;
 
@@ -168,9 +176,10 @@ namespace {
         auto it = g_objectByUid.find(uid);
         if (it == g_objectByUid.end()) return;
 
-        auto object = it->second;
+        // 지우는 동안 살아 있도록 먼저 붙잡아둔다.
+        Ref<GameObject> object = it->second;
         forget(uid);
-        editor->removeObject(object, true);
+        if (object) editor->removeObject(object, true);
     }
 
     // 아직 모르는 오브젝트다. uid를 붙이고 서버에 알린다.
