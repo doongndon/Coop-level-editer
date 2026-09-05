@@ -23,11 +23,11 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CPM.cmake)
 endif()
 include(${CMAKE_BINARY_DIR}/CPM.cmake)
 
-# ✅ IXWebSocket v11.5.0 (CMake 3.21 호환)
+# ✅ IXWebSocket v11.4.6 (실제로 존재하는 태그, CMake 3.21 호환)
 CPMAddPackage(
     NAME IXWebSocket
     GITHUB_REPOSITORY machinezone/IXWebSocket
-    GIT_TAG v11.5.0
+    GIT_TAG v11.4.6
     OPTIONS "USE_ZLIB OFF"
 )
 target_link_libraries(${PROJECT_NAME} ixwebsocket)
