@@ -21,6 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use older, compatible Android NDK
+        if: runner.os == 'Linux'
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: true
+
       - name: Build mod
         uses: geode-sdk/build-geode-mod@main
         with:
