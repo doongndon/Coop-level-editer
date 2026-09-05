@@ -128,6 +128,8 @@ class $modify(CoopEditorUI, EditorUI) {
         coop::reconcile();
         coop::tickSongDownload();
         coop::fadeOldCursors();
+        coop::drawPeerSelection();
+        coop::sendView();
         this->updateCoopStatus();
     }
 

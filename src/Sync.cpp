@@ -41,6 +41,8 @@ namespace {
     std::string g_lastSettings;
     // 마지막으로 상대에게 알린 내 상태. 바뀌었을 때만 보낸다.
     std::string g_lastStats;
+    // 마지막으로 알린 내 선택. 바뀌었을 때만 보낸다.
+    std::string g_lastSelection;
     unsigned int g_statsTick = 0;
     constexpr unsigned int STATS_EVERY = 8;   // 0.25초 x 8 = 2초
 
@@ -349,6 +351,7 @@ namespace coop {
         g_active = false;
         g_lastSettings.clear();
         g_lastStats.clear();
+        g_lastSelection.clear();
         forgetAppliedSettings();
 
         matjson::Value msg;
@@ -493,7 +496,42 @@ namespace coop {
         g_scanIndex = (end >= total) ? 0 : end;
     }
 
+    GameObject* objectForUid(std::string const& uid) {
+        auto found = g_objectByUid.find(uid);
+        if (found == g_objectByUid.end()) return nullptr;
+        auto object = found->second.data();
+        return isInLevel(object) ? object : nullptr;
+    }
+
+    // 내가 지금 잡고 있는 것들을 상대에게 알린다.
+    // 같은 물건을 동시에 건드려 서로 덮어쓰는 사고를 눈으로 막기 위한 것.
+    void sendSelection(CCArray* selected) {
+        if (!inRoom() || g_applyingRemote) return;
+
+        std::string list;
+        if (selected) {
+            for (unsigned int i = 0; i < selected->count(); ++i) {
+                auto object = static_cast<GameObject*>(selected->objectAtIndex(i));
+                if (!object) continue;
+                if (auto it = g_uidByLocalId.find(object->m_uniqueID); it != g_uidByLocalId.end()) {
+                    if (!list.empty()) list += ',';
+                    list += it->second;
+                }
+            }
+        }
+
+        if (list == g_lastSelection) return;
+        g_lastSelection = list;
+
+        matjson::Value msg;
+        msg["type"] = "sel";
+        msg["uids"] = list;
+        send(std::move(msg));
+    }
+
     void syncSelection(CCArray* selected) {
+        sendSelection(selected);
+
         if (g_applyingRemote || !selected || !g_active || !inRoom()) return;
 
         auto editor = LevelEditorLayer::get();

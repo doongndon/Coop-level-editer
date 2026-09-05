@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -66,7 +67,104 @@ namespace {
     }
 }
 
+namespace {
+    // 상대가 잡고 있는 물체들의 uid.
+    std::vector<std::string> g_peerSelection;
+    // 그 물체들에 테두리를 그리는 판. 오브젝트 레이어에 붙여 같이 움직이게 한다.
+    Ref<CCDrawNode> g_selectionDraw;
+
+    // 상대가 보고 있는 화면. 따라가기 버튼이 쓴다.
+    CCPoint g_peerView = { 0.f, 0.f };
+    float g_peerZoom = 0.f;
+
+    std::chrono::steady_clock::time_point g_lastView;
+    constexpr auto VIEW_INTERVAL = std::chrono::milliseconds(1000);
+}
+
 namespace coop {
+
+    void applyPeerSelection(std::string const& uids) {
+        g_peerSelection.clear();
+
+        size_t start = 0;
+        while (start < uids.size()) {
+            auto comma = uids.find(',', start);
+            auto piece = uids.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            if (!piece.empty()) g_peerSelection.push_back(std::move(piece));
+            if (comma == std::string::npos) break;
+            start = comma + 1;
+        }
+    }
+
+    // 상대가 잡고 있는 물체에 테두리를 그린다. 주기적으로 부른다.
+    void drawPeerSelection() {
+        auto editor = LevelEditorLayer::get();
+        if (!editor || !editor->m_objectLayer) return;
+
+        // 판이 없거나 다른 레벨의 것이면 새로 붙인다.
+        auto draw = g_selectionDraw.data();
+        if (!draw || draw->getParent() != editor->m_objectLayer) {
+            draw = CCDrawNode::create();
+            draw->setZOrder(29000);
+            editor->m_objectLayer->addChild(draw);
+            g_selectionDraw = draw;
+        }
+
+        draw->clear();
+        if (g_peerSelection.empty()) return;
+
+        auto line = ccColor4F{ 1.f, 0.75f, 0.3f, 0.9f };
+        for (auto const& uid : g_peerSelection) {
+            auto object = objectForUid(uid);
+            if (!object) continue;
+
+            auto box = object->boundingBox();
+            CCPoint corners[4] = {
+                { box.getMinX(), box.getMinY() },
+                { box.getMaxX(), box.getMinY() },
+                { box.getMaxX(), box.getMaxY() },
+                { box.getMinX(), box.getMaxY() },
+            };
+            // 속을 채우지 않고 테두리만. 상대가 무엇을 잡았는지 보이되
+            // 그 물체 자체는 가리지 않아야 한다.
+            draw->drawPolygon(corners, 4, ccColor4F{ 0.f, 0.f, 0.f, 0.f }, 1.2f, line);
+        }
+    }
+
+    void sendView() {
+        auto editor = LevelEditorLayer::get();
+        if (!inRoom() || !editor || !editor->m_objectLayer) return;
+
+        // 화면은 계속 움직인다. 매번 보내면 회선이 낭비되므로 가끔만.
+        auto now = std::chrono::steady_clock::now();
+        if (now - g_lastView < VIEW_INTERVAL) return;
+        g_lastView = now;
+
+        matjson::Value msg;
+        msg["type"] = "view";
+        msg["x"] = editor->m_objectLayer->getPositionX();
+        msg["y"] = editor->m_objectLayer->getPositionY();
+        msg["z"] = editor->m_objectLayer->getScale();
+        send(std::move(msg));
+    }
+
+    void applyPeerView(float x, float y, float zoom) {
+        g_peerView = cocos2d::CCPoint(x, y);
+        g_peerZoom = zoom;
+    }
+
+    bool hasPeerView() {
+        return g_peerZoom > 0.f;
+    }
+
+    // 상대가 보고 있는 자리로 화면을 옮긴다.
+    void goToPeerView() {
+        auto editor = LevelEditorLayer::get();
+        if (!editor || !editor->m_objectLayer || !hasPeerView()) return;
+
+        editor->m_objectLayer->setScale(g_peerZoom);
+        editor->m_objectLayer->setPosition(g_peerView);
+    }
 
     void sendCursor(CCPoint position) {
         if (!inRoom()) return;
@@ -123,6 +221,13 @@ namespace coop {
     }
 
     void clearCursors() {
+        g_peerSelection.clear();
+        g_peerZoom = 0.f;
+        if (auto draw = g_selectionDraw.data()) {
+            draw->removeFromParent();
+        }
+        g_selectionDraw = nullptr;
+
         for (auto& [id, cursor] : g_cursors) {
             if (auto node = cursor.node.data()) {
                 node->removeFromParent();

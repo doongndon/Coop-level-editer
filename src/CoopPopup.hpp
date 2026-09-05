@@ -16,12 +16,17 @@
 class CoopPopup : public geode::Popup {
 protected:
     geode::TextInput* m_roomInput = nullptr;
+    geode::TextInput* m_passwordInput = nullptr;
     cocos2d::CCMenu* m_roomListMenu = nullptr;
     CCMenuItemSpriteExtra* m_leaveButton = nullptr;
     CCMenuItemSpriteExtra* m_updateButton = nullptr;
+    CCMenuItemSpriteExtra* m_followButton = nullptr;
     cocos2d::CCLabelBMFont* m_whereLabel = nullptr;
     cocos2d::CCLabelBMFont* m_versionLabel = nullptr;
-    cocos2d::CCLabelBMFont* m_debugLabel = nullptr;
+    // 진단은 두 줄이다. 한 덩어리로 만들면 줄바꿈 처리 때문에 아무것도
+    // 안 그려지는 일이 있어서, 아예 라벨을 둘로 나눴다.
+    cocos2d::CCLabelBMFont* m_myStatsLabel = nullptr;
+    cocos2d::CCLabelBMFont* m_peerStatsLabel = nullptr;
     cocos2d::CCLabelBMFont* m_emptyLabel = nullptr;
     cocos2d::CCLabelBMFont* m_statusLabel = nullptr;
     std::string m_shownRooms;
@@ -29,13 +34,32 @@ protected:
     bool init();
     void tick(float);
     void rebuildRoomList();
+    // 방을 만들거나 들어가기 직전에 열쇠를 정해준다.
+    void useTypedPassword();
 
     void onCreate(CCMenuItemSpriteExtra*);
     void onLeave(CCMenuItemSpriteExtra*);
     void onUpdate(CCMenuItemSpriteExtra*);
+    void onChat(CCMenuItemSpriteExtra*);
+    void onFollow(CCMenuItemSpriteExtra*);
     // 들어가면 내 레벨이 지워지므로 먼저 물어본다.
-    void askJoin(std::string const& name);
+    void askJoin(std::string const& name, bool locked);
 
 public:
     static CoopPopup* create();
+};
+
+// 방 안에서 짧게 주고받는 말.
+class CoopChatPopup : public geode::Popup {
+protected:
+    geode::TextInput* m_input = nullptr;
+    cocos2d::CCLabelBMFont* m_lines[8] = {};
+    std::string m_shown;
+
+    bool init();
+    void tick(float);
+    void onSend(CCMenuItemSpriteExtra*);
+
+public:
+    static CoopChatPopup* create();
 };

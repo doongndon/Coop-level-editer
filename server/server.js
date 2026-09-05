@@ -22,6 +22,8 @@ const PORT = process.env.PORT || 8787;
 const rooms = new Map();
 
 const MAX_ROOMS = 200;
+// 방에 보관할 채팅 줄 수. 나중에 들어온 사람이 흐름을 따라올 정도만.
+const CHAT_KEEP = 20;
 const MAX_ROOM_NAME = 32;
 // 비어 있는 방을 얼마나 붙들고 있을지. 잠깐 게임을 껐다 켜는 정도는 버텨야 한다.
 const EMPTY_ROOM_TTL_MS = 2 * 60 * 60 * 1000;
@@ -79,6 +81,8 @@ function sendRoomList(client) {
             count: room.clients.size,
             owner: room.owner,
             objects: room.objects.size,
+            // 비밀번호 자체는 절대 내보내지 않는다. 잠겼는지만 알린다.
+            locked: room.password ? 1 : 0,
         });
     }
     // 사람이 있는 방을 위로, 그다음은 이름순.
@@ -128,6 +132,8 @@ function enterRoom(client, room) {
         sendState(room, client);
     }
 
+    for (const line of room.chat) sendTo(client, { type: "chat", ...line });
+
     announcePeers(room);
     relay(room, client, { type: "joined", name: client.playerName });
 }
@@ -147,7 +153,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v6 (peer stats)";
+const SERVER_VERSION = "v7 (chat, locks, selection)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -199,6 +205,9 @@ wss.on("connection", client => {
                     return fail(client, "That room name is already in use");
                 }
                 existing.owner = client.playerName;
+                if (typeof msg.password === "string") {
+                    existing.password = msg.password.slice(0, 32);
+                }
                 enterRoom(client, existing);
                 sendRoomList(client);
                 return;
@@ -215,6 +224,9 @@ wss.on("connection", client => {
                 objects: new Map(),
                 // 배경, 바닥, 색깔, 노래. 레벨에 하나뿐인 값이라 통째로 보관한다.
                 settings: null,
+                chat: [],
+                // 빈 문자열이면 누구나 들어올 수 있다.
+                password: typeof msg.password === "string" ? msg.password.slice(0, 32) : "",
                 owner: client.playerName,
                 createdAt: Date.now(),
                 emptySince: 0,
@@ -232,6 +244,15 @@ wss.on("connection", client => {
             if (!name) return fail(client, "Room name is empty");
 
             const room = rooms.get(name);
+
+            // 잠긴 방은 열쇠가 맞아야 들어간다.
+            // 방이 있는지 확인하기 전에 본다. 없는 방과 잠긴 방을 같은 말로
+            // 거절해야 열쇠를 모르는 사람이 방 존재 여부를 떠볼 수 없다.
+            if (room && room.password && msg.password !== room.password) {
+                sendTo(client, { type: "room", name: client.roomName || "" });
+                return fail(client, "Wrong password");
+            }
+
             // 없는 방에 몰래 들어가면서 방이 생기지 않도록 한다.
             // 이게 예전에 목록과 실제 방이 어긋나던 원인이었다.
             if (!room) {
@@ -259,6 +280,23 @@ wss.on("connection", client => {
             case "resync":
                 sendState(room, client);
                 return;
+
+            // 상대가 잡고 있는 물체, 보고 있는 화면. 계속 바뀌므로 흘려보낸다.
+            case "sel":
+            case "view":
+                relay(room, client, { ...msg, from: client.clientId, name: client.playerName });
+                return;
+
+            // 채팅. 나중에 들어온 사람에게도 최근 몇 줄은 보여준다.
+            case "chat": {
+                if (typeof msg.text !== "string" || msg.text === "") return;
+                const line = { name: client.playerName, text: msg.text.slice(0, 120) };
+                room.chat.push(line);
+                if (room.chat.length > CHAT_KEEP) room.chat.shift();
+                // 보낸 사람에게도 돌려준다. 자기 말이 방에 닿았는지 보이도록.
+                for (const peer of room.clients) sendTo(peer, { type: "chat", ...line });
+                return;
+            }
 
             // 상대가 지금 무엇을 얼마나 주고받고 있는지. 보관하지 않고 흘려보낸다.
             // 두 기기를 오가지 않고 한쪽 화면에서 양쪽 상태를 보려는 것이다.

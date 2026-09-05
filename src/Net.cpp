@@ -90,11 +90,15 @@ namespace {
         sendRaw(msg);
     }
 
+    // 방을 만들거나 들어갈 때 쓴 열쇠. 연결이 끊겨 다시 들어갈 때도 필요하다.
+    std::string g_roomPassword;
+
     void sendRoomAction(char const* type, std::string const& room) {
         matjson::Value msg;
         msg["type"] = type;
         msg["room"] = room;
         msg["name"] = coop::defaultPlayerName();
+        msg["password"] = g_roomPassword;
         sendRaw(msg);
     }
 
@@ -178,6 +182,7 @@ namespace {
                         room.count = static_cast<int>(entry["count"].asInt().unwrapOr(0));
                         room.owner = entry["owner"].asString().unwrapOr("");
                         room.objects = static_cast<int>(entry["objects"].asInt().unwrapOr(0));
+                        room.locked = entry["locked"].asInt().unwrapOr(0) != 0;
                         if (!room.name.empty()) g_roomList.push_back(std::move(room));
                     }
                 }
@@ -194,6 +199,7 @@ namespace {
                 g_currentRoom = name;
                 g_peerCount = 0;
                 coop::clearCursors();
+                coop::clearChat();
 
                 // 방이 바뀌면 이전 방에서 쓰던 대응표는 전부 의미가 없다.
                 // 여기서 비우지 않으면 옛 uid가 새 방에 섞여 들어가 꼬인다.
@@ -237,6 +243,28 @@ namespace {
                         static_cast<float>(value["x"].asDouble().unwrapOr(0)),
                         static_cast<float>(value["y"].asDouble().unwrapOr(0))
                     )
+                );
+                return;
+            }
+
+            if (type == "sel") {
+                coop::applyPeerSelection(value["uids"].asString().unwrapOr(""));
+                return;
+            }
+
+            if (type == "view") {
+                coop::applyPeerView(
+                    static_cast<float>(value["x"].asDouble().unwrapOr(0)),
+                    static_cast<float>(value["y"].asDouble().unwrapOr(0)),
+                    static_cast<float>(value["z"].asDouble().unwrapOr(0))
+                );
+                return;
+            }
+
+            if (type == "chat") {
+                coop::addChatLine(
+                    value["name"].asString().unwrapOr("?"),
+                    value["text"].asString().unwrapOr("")
                 );
                 return;
             }
@@ -348,6 +376,10 @@ namespace coop {
 
     // 방 만들기와 들어가기는 접속을 다시 하지 않는다. 예전에는 방을 바꿀 때마다
     // 소켓을 끊고 새로 이었는데, 그 사이에 오간 메시지가 사라져서 꼬였다.
+    void setRoomPassword(std::string password) {
+        g_roomPassword = std::move(password);
+    }
+
     void createRoom(std::string room) {
         if (g_state != State::Connected) {
             rememberRoom(room);

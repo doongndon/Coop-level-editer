@@ -47,6 +47,10 @@ namespace coop {
     // 방 이름 칸에 미리 채워줄 이름. 계정 이름을 따서 만든다.
     std::string suggestedRoomName();
 
+    // 방을 만들거나 들어갈 때 쓸 열쇠. 비워두면 잠그지 않는다.
+    // 만들기/들어가기를 부르기 직전에 정해준다.
+    void setRoomPassword(std::string password);
+
     // 새 방을 만들고 바로 들어간다. 만들어진 방은 목록에 올라간다.
     void createRoom(std::string room);
     // 이미 있는 방에 들어간다. 없는 방이면 서버가 거절한다.
@@ -61,6 +65,7 @@ namespace coop {
         int count = 0;
         std::string owner;
         int objects = 0;
+        bool locked = false;
     };
     std::vector<RoomEntry> roomList();
     // 연결돼 있을 때만 실제로 보낸다.
@@ -138,6 +143,30 @@ namespace coop {
     // 커서를 몇 개 보내고 몇 개 받았는지.
     int cursorsSent();
     int cursorsReceived();
+
+    // --- 상대가 잡고 있는 물체 / 보고 있는 화면 ---
+
+    // uid로 오브젝트를 찾는다. 없거나 이미 레벨에서 빠졌으면 nullptr.
+    GameObject* objectForUid(std::string const& uid);
+    // 서버에서 온 "상대가 잡고 있는 것" 목록을 받아둔다.
+    void applyPeerSelection(std::string const& uids);
+    // 그 물체들에 테두리를 그린다. 주기적으로 부른다.
+    void drawPeerSelection();
+
+    // 내가 보고 있는 화면 위치를 알린다. 주기적으로 부른다.
+    void sendView();
+    void applyPeerView(float x, float y, float zoom);
+    bool hasPeerView();
+    // 상대가 보고 있는 자리로 화면을 옮긴다.
+    void goToPeerView();
+
+    // --- 채팅 (Chat.cpp) ---
+    //
+    // GD 기본 글꼴에는 한글 글자가 없다. 그래서 그릴 수 있는 글자만 보낸다.
+    void sendChat(std::string const& text);
+    void addChatLine(std::string const& who, std::string const& text);
+    void clearChat();
+    std::vector<std::string> chatLines();
 
     // 어디가 끊겼는지 한 줄로 보여준다. 화면에서 바로 보려고.
     std::string diagnostics();
