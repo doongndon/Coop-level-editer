@@ -50,6 +50,21 @@ jobs:
           name: coop-mod-${{ matrix.target }}
           path: build/*.geode
 
+      # 기기별로 이름을 다르게 붙인다. 한 곳에 모아 올릴 때 서로 덮어쓰지 않도록.
+      - name: Name the file per platform
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p release
+          cp build/*.geode "release/coopedit-${{ matrix.target }}.geode"
+
+      - name: Upload for release
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: release-${{ matrix.target }}
+          path: release/*.geode
+
       - name: Debug on failure
         if: failure()
         shell: bash
@@ -59,3 +74,32 @@ jobs:
             head -50 "$f"
           done
           ls -la cpm-cache/ 2>/dev/null || echo "No cpm-cache"
+
+  # 만들어진 파일을 "latest" 릴리스 하나에 모아 올린다.
+  #
+  # Actions의 첨부 파일은 압축돼 있고 GitHub 로그인이 필요해서, 폰에서 받으려면
+  # 손이 많이 간다. 릴리스 파일은 주소만 있으면 바로 받아지고 주소도 늘 같다.
+  # 모드 안에서 스스로 새 버전을 받아올 때도 이 주소를 쓴다.
+  publish:
+    needs: build
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release
+
+      - name: Publish rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          body: |
+            ${{ github.sha }}
+            자동으로 만들어진 최신 빌드입니다. 커밋마다 이 자리를 덮어씁니다.
+          prerelease: true
+          files: release/*.geode

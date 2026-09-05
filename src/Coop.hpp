@@ -122,6 +122,14 @@ namespace coop {
     // 한동안 소식 없는 커서를 치운다. 주기적으로 부른다.
     void fadeOldCursors();
 
+    // --- 모드 갱신 (Updater.cpp) ---
+    //
+    // 새 빌드를 게임 안에서 바로 받아 자기 자리에 덮어쓴다.
+    // 파일을 손으로 옮기고 게임을 껐다 켤 일을 없애기 위한 것.
+    void updateMod();
+    bool isUpdating();
+    std::string modVersion();
+
     // --- 인증서 (빌드할 때 생성되는 CaBundle.cpp) ---
 
     // wss:// 접속 때 신뢰할 인증서 묶음 전문.

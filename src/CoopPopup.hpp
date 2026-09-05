@@ -18,6 +18,7 @@ protected:
     geode::TextInput* m_roomInput = nullptr;
     cocos2d::CCMenu* m_roomListMenu = nullptr;
     CCMenuItemSpriteExtra* m_leaveButton = nullptr;
+    CCMenuItemSpriteExtra* m_updateButton = nullptr;
     cocos2d::CCLabelBMFont* m_whereLabel = nullptr;
     cocos2d::CCLabelBMFont* m_emptyLabel = nullptr;
     cocos2d::CCLabelBMFont* m_statusLabel = nullptr;
@@ -29,6 +30,7 @@ protected:
 
     void onCreate(CCMenuItemSpriteExtra*);
     void onLeave(CCMenuItemSpriteExtra*);
+    void onUpdate(CCMenuItemSpriteExtra*);
     // 들어가면 내 레벨이 지워지므로 먼저 물어본다.
     void askJoin(std::string const& name);
 

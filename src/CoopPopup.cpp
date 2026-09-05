@@ -73,6 +73,25 @@ bool CoopPopup::init() {
     hint->setOpacity(140);
     m_mainLayer->addChildAtPosition(hint, Anchor::Bottom, ccp(0.f, 38.f));
 
+    // --- 모드 갱신 ---
+    // 새 빌드가 나왔을 때 파일을 손으로 옮기지 않아도 되도록.
+    auto updateMenu = CCMenu::create();
+    updateMenu->setContentSize({ 90.f, 26.f });
+    m_updateButton = CCMenuItemExt::createSpriteExtra(
+        ButtonSprite::create("Update", "bigFont.fnt", "GJ_button_02.png", 0.45f),
+        [this](CCMenuItemSpriteExtra*) { this->onUpdate(nullptr); }
+    );
+    updateMenu->addChild(m_updateButton);
+    updateMenu->setLayout(RowLayout::create());
+    m_mainLayer->addChildAtPosition(updateMenu, Anchor::TopRight, ccp(-46.f, -24.f));
+
+    auto versionLabel = CCLabelBMFont::create(
+        fmt::format("v{}", coop::modVersion()).c_str(), "chatFont.fnt"
+    );
+    versionLabel->setScale(0.4f);
+    versionLabel->setOpacity(120);
+    m_mainLayer->addChildAtPosition(versionLabel, Anchor::TopLeft, ccp(34.f, -24.f));
+
     // --- 접속 상태 ---
     m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
     m_statusLabel->setScale(0.45f);
@@ -148,6 +167,10 @@ void CoopPopup::tick(float) {
         }
     }
 
+    if (m_updateButton) {
+        m_updateButton->setEnabled(!coop::isUpdating());
+    }
+
     // 방에 있을 때만 나가기를 누를 수 있다.
     if (m_leaveButton) {
         m_leaveButton->setEnabled(coop::inRoom());
@@ -195,6 +218,22 @@ void CoopPopup::onCreate(CCMenuItemSpriteExtra*) {
 
 void CoopPopup::onLeave(CCMenuItemSpriteExtra*) {
     coop::leaveRoom();
+}
+
+// 새 빌드를 받아 이 모드 자리에 덮어쓴다. 게임을 다시 켜면 새 것이 올라온다.
+void CoopPopup::onUpdate(CCMenuItemSpriteExtra*) {
+    if (coop::isUpdating()) return;
+
+    geode::createQuickPopup(
+        "Update Mod",
+        "Download the newest build and replace this mod?\n\n"
+        "You are on <cy>v" + coop::modVersion() + "</c>.\n"
+        "It takes effect after you <cg>restart GD</c>.",
+        "Cancel", "Update",
+        [](FLAlertLayer*, bool go) {
+            if (go) coop::updateMod();
+        }
+    );
 }
 
 // 남의 방에 들어가면 지금 편집 중인 레벨은 그 방의 레벨로 바뀐다.
