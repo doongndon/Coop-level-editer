@@ -89,6 +89,18 @@ namespace coop {
     // 손님이 될 때: 내 레벨을 비운다. 방의 레벨을 그대로 받기 위해서다.
     void clearLevel();
 
+    // --- 손님용 임시 레벨 (Workspace.cpp) ---
+    //
+    // 원본은 방장의 레벨 하나뿐이어야 한다. 손님이 자기 레벨에 방 내용을
+    // 받으면 참여한 사람 수만큼 사본이 생긴다. 그래서 손님은 그때그때 만든
+    // 임시 레벨에서 작업하고, 나갈 때 그 레벨을 지운다.
+    void openWorkspace(std::string const& room);
+    void dropWorkspace();
+    void sweepOldWorkspaces();
+    bool inWorkspace();
+    // 방금 열린 에디터가 우리가 방 때문에 연 것인지. 한 번만 참을 돌려준다.
+    bool consumeWorkspaceEntry();
+
     // --- 레벨 설정 (LevelState.cpp) ---
     //
     // 배경, 바닥, 색깔, 노래, 게임 모드 같은 것. 오브젝트와 달리 레벨 전체에

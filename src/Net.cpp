@@ -196,7 +196,9 @@ namespace {
                     coop::uploadWholeLevel();
                     note = fmt::format("Sharing your level in \"{}\"", name);
                 } else if (mode == "guest") {
-                    coop::clearLevel();
+                    // 손님은 자기 레벨을 건드리지 않는다. 임시 레벨을 새로
+                    // 만들어 그리로 옮겨가고, 방 내용은 거기에 받는다.
+                    coop::openWorkspace(name);
                     note = fmt::format("Loading the level from \"{}\"", name);
                 } else {
                     note = "Left the room";
