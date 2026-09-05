@@ -49,6 +49,16 @@ CPMAddPackage(
         "DISABLE_PACKAGE_CONFIG_AND_INSTALL ON"
 )
 
+# 윈도우에서는 하드웨어 AES 가속 코드가 컴파일되지 않아 꺼야 한다(자세한 이유는 설정 파일에).
+# 설정이 라이브러리마다 달라지면 안 되므로 mbedTLS 세 갈래 모두에 똑같이 적용한다.
+if (WIN32)
+    foreach (COOP_MBEDTLS_TARGET mbedcrypto mbedx509 mbedtls)
+        target_compile_definitions(${COOP_MBEDTLS_TARGET} PUBLIC
+            "MBEDTLS_USER_CONFIG_FILE=\"${CMAKE_CURRENT_SOURCE_DIR}/cmake/mbedtls_user_config.h\""
+        )
+    endforeach()
+endif()
+
 # IXWebSocket은 find_package(MbedTLS)로 라이브러리를 찾으려 한다.
 # 우리는 위에서 직접 빌드했으므로 결과를 알려주고 그 단계를 건너뛰게 한다.
 set(MBEDTLS_FOUND TRUE)
