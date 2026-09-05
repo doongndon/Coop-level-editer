@@ -5,8 +5,6 @@ if (NOT DEFINED ENV{GEODE_SDK})
     message(FATAL_ERROR "GEODE_SDK 환경변수가 설정되어 있어야 합니다 (Geode CLI로 설치)")
 endif()
 
-include($ENV{GEODE_SDK}/loader/include/CMakeLists.txt)
-
 file(GLOB SOURCES src/*.cpp)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
@@ -24,4 +22,5 @@ include(${CMAKE_BINARY_DIR}/CPM.cmake)
 CPMAddPackage("gh:machinezone/IXWebSocket#v11.4.5")
 target_link_libraries(${PROJECT_NAME} ixwebsocket)
 
+add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 setup_geode_mod(${PROJECT_NAME})
