@@ -101,11 +101,14 @@ namespace coop {
         auto manager = GameLevelManager::sharedState();
         if (!local || !manager || !local->m_localLevels) return;
 
+        // 지금 그 레벨에서 작업 중이면 지우면 안 된다.
+        auto inUse = g_workspace.data();
+
         // 지우는 동안 목록이 줄어들므로 먼저 따로 담는다.
         std::vector<Ref<GJGameLevel>> doomed;
         for (unsigned int i = 0; i < local->m_localLevels->count(); ++i) {
             auto level = static_cast<GJGameLevel*>(local->m_localLevels->objectAtIndex(i));
-            if (level && isWorkspaceName(std::string(level->m_levelName))) {
+            if (level && level != inUse && isWorkspaceName(std::string(level->m_levelName))) {
                 doomed.push_back(level);
             }
         }
@@ -121,41 +124,48 @@ namespace coop {
 
 }
 
-// 남은 임시 레벨은 첫 화면이 뜰 때 한 번 치운다.
+// 첫 화면이 뜰 때마다 남은 임시 레벨을 치운다.
+//
+// 한 번만 하지 않는 이유는, 에디터에서 나가는 길이 여러 갈래라 그중 하나라도
+// 놓치면 임시 레벨이 목록에 그대로 남기 때문이다. 첫 화면은 결국 언제나
+// 지나가게 되므로 여기서 한 번 더 훑는 것이 가장 확실하다.
 //
 // 모드가 올라오는 시점에 하면 안 된다. 그때는 레벨 목록을 들고 있는 쪽이
 // 아직 준비되지 않아서, 억지로 부르면 그쪽을 너무 일찍 깨우게 된다.
 class $modify(CoopMenuLayer, MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
-
-        static bool swept = false;
-        if (!swept) {
-            swept = true;
-            coop::sweepOldWorkspaces();
-        }
+        coop::sweepOldWorkspaces();
         return true;
     }
 };
 
 // 에디터에서 나갈 때 임시 레벨을 지운다.
-// 저장하고 나가든 저장하지 않고 나가든 똑같이 지워야 한다.
+//
+// 나가는 길이 세 갈래다. 저장하고 나가기, 그냥 나가기, 저장 없이 나가기.
+// 처음에는 두 개만 걸어놔서, 사람들이 가장 많이 쓰는 "Save & Exit"으로
+// 나가면 임시 레벨이 그대로 남았다.
 class $modify(CoopEditorPauseLayer, EditorPauseLayer) {
+    void cleanUpWorkspace() {
+        coop::leaveRoom();
+        coop::dropWorkspace();
+    }
+
     void onExitEditor(CCObject* sender) {
         auto leaving = coop::inWorkspace();
         EditorPauseLayer::onExitEditor(sender);
-        if (leaving) {
-            coop::leaveRoom();
-            coop::dropWorkspace();
-        }
+        if (leaving) this->cleanUpWorkspace();
+    }
+
+    void onSaveAndExit(CCObject* sender) {
+        auto leaving = coop::inWorkspace();
+        EditorPauseLayer::onSaveAndExit(sender);
+        if (leaving) this->cleanUpWorkspace();
     }
 
     void onExitNoSave(CCObject* sender) {
         auto leaving = coop::inWorkspace();
         EditorPauseLayer::onExitNoSave(sender);
-        if (leaving) {
-            coop::leaveRoom();
-            coop::dropWorkspace();
-        }
+        if (leaving) this->cleanUpWorkspace();
     }
 };

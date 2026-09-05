@@ -94,9 +94,9 @@ bool CoopPopup::init() {
 
     // 커서와 색이 실제로 오가고 있는지. 안 될 때 어느 쪽이 끊겼는지 바로 보인다.
     m_debugLabel = CCLabelBMFont::create("", "chatFont.fnt");
-    m_debugLabel->setScale(0.34f);
-    m_debugLabel->setOpacity(110);
-    m_mainLayer->addChildAtPosition(m_debugLabel, Anchor::Bottom, ccp(0.f, 27.f));
+    m_debugLabel->setScale(0.5f);
+    m_debugLabel->setColor({ 255, 220, 120 });
+    m_mainLayer->addChildAtPosition(m_debugLabel, Anchor::Bottom, ccp(0.f, 62.f));
 
     // --- 접속 상태 ---
     m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
@@ -183,8 +183,9 @@ void CoopPopup::tick(float) {
 
     if (m_versionLabel) {
         auto server = coop::serverVersion();
+        // modVersion()이 이미 앞에 v를 붙여 준다. 여기서 또 붙이면 "vv0.8.0".
         m_versionLabel->setString(fmt::format(
-            "mod v{}   server {}", coop::modVersion(), server.empty() ? "?" : server
+            "mod {}   server {}", coop::modVersion(), server.empty() ? "?" : server
         ).c_str());
     }
 
