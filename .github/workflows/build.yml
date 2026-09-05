@@ -48,6 +48,9 @@ jobs:
           target: ${{ matrix.target }}
         env:
           CMAKE_SUPPRESS_DEVELOPER_WARNINGS: "ON"
+          # 최신 CMake는 너무 오래된 cmake_minimum_required(3.5 미만)를 요구하는
+          # 의존성(result 등)을 거부함 - 최소 정책 버전을 지정해 우회
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
       - name: Upload result
         uses: actions/upload-artifact@v4
