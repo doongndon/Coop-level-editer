@@ -68,9 +68,19 @@ namespace {
     // 색깔은 kS38 하나에 다 들어 있다.
     // 통로 하나가 "1_255_2_0_..._6_1001_..." 이고, 통로끼리는 | 로 이어져 있다.
     // 키 6이 몇 번 색 통로인지를 뜻한다.
+    // 실제로 몇 개의 색 통로를 반영했는지. 창에 띄워서 색이 안 맞을 때
+    // 내용이 안 온 것인지 반영에 실패한 것인지 구분하려고 센다.
+    int g_colorsApplied = 0;
+    // 내가 보내는 색 내용의 길이. 0이면 GD에게서 색을 아예 못 받아온 것이고,
+    // 그건 반영 쪽이 아니라 읽어오는 쪽이 문제라는 뜻이다.
+    int g_colorCharsOut = 0;
+    int g_colorCharsIn = 0;
+
     void applyColors(LevelEditorLayer* editor, std::string const& blob) {
         auto manager = editor->m_effectManager;
         if (!manager || blob.empty()) return;
+
+        int applied = 0;
 
         size_t start = 0;
         while (start <= blob.size()) {
@@ -97,11 +107,19 @@ namespace {
                     at = under + 1;
                 }
 
-                // 이미 있는 색 통로를 그 자리에서 고친다. 새로 만들어 갈아끼우면
-                // 누가 그 통로를 들고 있는지 알 수 없어 위험하다.
                 if (channel != 0) {
+                    // 이미 있는 통로는 그 자리에서 고친다. 새로 만들어 갈아끼우면
+                    // 누가 그 통로를 들고 있는지 알 수 없어 위험하다.
                     if (auto action = manager->getColorAction(channel)) {
                         action->setupFromString(entry);
+                        ++applied;
+                    }
+                    // 상대가 쓰는 통로를 내 레벨이 아직 안 갖고 있을 수 있다.
+                    // 그 경우 없다고 넘기면 그 색만 영영 안 맞는다. 만들어 넣는다.
+                    else if (auto fresh = ColorAction::create()) {
+                        fresh->setupFromString(entry);
+                        manager->setColorAction(fresh, channel);
+                        ++applied;
                     }
                 }
             }
@@ -109,6 +127,8 @@ namespace {
             if (bar == std::string::npos) break;
             start = bar + 1;
         }
+
+        g_colorsApplied = applied;
 
         manager->calculateBaseActiveColors();
         if (editor->m_objects) {
@@ -207,11 +227,13 @@ namespace coop {
         }
 
         // 색깔은 양이 많아서 맨 뒤에 붙인다.
+        g_colorCharsOut = 0;
         if (auto found = values.find(COLOR_KEY); found != values.end() && !found->second.empty()) {
             if (!out.empty()) out += ',';
             out += COLOR_KEY;
             out += ',';
             out += found->second;
+            g_colorCharsOut = static_cast<int>(found->second.size());
         }
         return out;
     }
@@ -224,6 +246,16 @@ namespace coop {
     int levelAudioTrack() {
         auto editor = LevelEditorLayer::get();
         return (editor && editor->m_level) ? editor->m_level->m_audioTrack : 0;
+    }
+
+    // 어디가 끊겼는지 창에서 바로 보려고 모아 보여준다.
+    // cur = 커서 보낸/받은 개수, col = 색 글자수 보낸/받은, ok = 반영한 통로 수
+    std::string diagnostics() {
+        return fmt::format(
+            "cur {}/{}  col {}/{}  ok {}",
+            cursorsSent(), cursorsReceived(),
+            g_colorCharsOut, g_colorCharsIn, g_colorsApplied
+        );
     }
 
     void forgetAppliedSettings() {
@@ -343,7 +375,9 @@ namespace coop {
         settings->m_fadeIn     = boolOf(values, "kA15", settings->m_fadeIn);
         settings->m_fadeOut    = boolOf(values, "kA16", settings->m_fadeOut);
 
-        applyColors(editor, stringOf(values, COLOR_KEY));
+        auto incomingColors = stringOf(values, COLOR_KEY);
+        g_colorCharsIn = static_cast<int>(incomingColors.size());
+        applyColors(editor, incomingColors);
 
         // 노래는 설정 문자열이 아니라 레벨에 붙어 있어서 따로 받는다.
         // 상대가 그 노래를 내려받아 두지 않았으면 번호만 맞고 소리는 나지 않는다.

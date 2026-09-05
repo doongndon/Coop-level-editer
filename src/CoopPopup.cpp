@@ -92,6 +92,12 @@ bool CoopPopup::init() {
     m_versionLabel->setAnchorPoint({ 0.f, 0.5f });
     m_mainLayer->addChildAtPosition(m_versionLabel, Anchor::TopLeft, ccp(14.f, -24.f));
 
+    // 커서와 색이 실제로 오가고 있는지. 안 될 때 어느 쪽이 끊겼는지 바로 보인다.
+    m_debugLabel = CCLabelBMFont::create("", "chatFont.fnt");
+    m_debugLabel->setScale(0.34f);
+    m_debugLabel->setOpacity(110);
+    m_mainLayer->addChildAtPosition(m_debugLabel, Anchor::Bottom, ccp(0.f, 27.f));
+
     // --- 접속 상태 ---
     m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
     m_statusLabel->setScale(0.45f);
@@ -169,6 +175,10 @@ void CoopPopup::tick(float) {
 
     if (m_updateButton) {
         m_updateButton->setEnabled(!coop::isUpdating());
+    }
+
+    if (m_debugLabel) {
+        m_debugLabel->setString(coop::diagnostics().c_str());
     }
 
     if (m_versionLabel) {

@@ -126,12 +126,28 @@ class $modify(CoopEditorUI, EditorUI) {
     // 손가락이 움직일 때마다 상대에게 위치를 알린다.
     // 화면 좌표가 아니라 레벨 좌표로 바꿔서 보내야 서로 같은 곳을 가리킨다.
     // 사람마다 화면 크기와 확대 배율이 다르기 때문이다.
-    void ccTouchMoved(CCTouch* touch, CCEvent* event) {
-        EditorUI::ccTouchMoved(touch, event);
-
+    // 손가락이 닿고, 움직이고, 떨어질 때 모두 자리를 알린다.
+    // 움직일 때만 보내면 한 번 콕 찍는 동작은 상대에게 보이지 않는다.
+    void tellWhereIAm(CCTouch* touch) {
         if (auto editor = LevelEditorLayer::get(); editor && editor->m_objectLayer && touch) {
             coop::sendCursor(editor->m_objectLayer->convertToNodeSpace(touch->getLocation()));
         }
+    }
+
+    bool ccTouchBegan(CCTouch* touch, CCEvent* event) {
+        auto handled = EditorUI::ccTouchBegan(touch, event);
+        this->tellWhereIAm(touch);
+        return handled;
+    }
+
+    void ccTouchMoved(CCTouch* touch, CCEvent* event) {
+        EditorUI::ccTouchMoved(touch, event);
+        this->tellWhereIAm(touch);
+    }
+
+    void ccTouchEnded(CCTouch* touch, CCEvent* event) {
+        EditorUI::ccTouchEnded(touch, event);
+        this->tellWhereIAm(touch);
     }
 
     GameObject* createObject(int objectID, CCPoint position) {

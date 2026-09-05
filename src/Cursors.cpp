@@ -20,6 +20,10 @@ namespace {
     std::unordered_map<std::string, PeerCursor> g_cursors;
     std::chrono::steady_clock::time_point g_lastSent;
 
+    // 보낸 개수와 받은 개수. 어느 쪽이 끊겼는지 창에서 바로 보려고 센다.
+    int g_sentCount = 0;
+    int g_gotCount = 0;
+
     // 손가락은 계속 움직이므로 그대로 다 보내면 회선이 낭비된다.
     constexpr auto SEND_INTERVAL = std::chrono::milliseconds(100);
     // 한동안 소식이 없는 커서는 치운다. 상대가 손을 뗐거나 나간 것.
@@ -40,13 +44,16 @@ namespace {
         auto holder = CCNode::create();
         holder->setZOrder(30000);
 
-        // 뾰족한 화살표 대신 동그라미를 쓴다. 에디터 배경 위에서 더 잘 보인다.
-        if (auto dot = CCSprite::createWithSpriteFrameName("d_circle_01_001.png")) {
-            dot->setScale(0.35f);
-            dot->setColor(color);
-            dot->setOpacity(200);
-            holder->addChild(dot);
-        }
+        // 게임 그림을 빌려 쓰지 않고 직접 그린다.
+        //
+        // 처음에는 게임에 있는 동그라미 그림을 갖다 썼는데, 그 그림은 특정
+        // 그림 묶음이 메모리에 올라와 있을 때만 찾을 수 있다. 에디터에서
+        // 그 묶음이 없으면 아무것도 안 나온다. 직접 그리면 그럴 일이 없다.
+        auto dot = CCDrawNode::create();
+        auto fill = ccColor4F{ color.r / 255.f, color.g / 255.f, color.b / 255.f, 0.85f };
+        dot->drawDot({ 0.f, 0.f }, 7.f, fill);
+        dot->drawDot({ 0.f, 0.f }, 3.f, ccColor4F{ 1.f, 1.f, 1.f, 0.9f });
+        holder->addChild(dot);
 
         auto label = CCLabelBMFont::create(name.c_str(), "chatFont.fnt");
         label->setScale(0.5f);
@@ -74,9 +81,17 @@ namespace coop {
         msg["x"] = position.x;
         msg["y"] = position.y;
         send(std::move(msg));
+        ++g_sentCount;
     }
 
+    int cursorsSent() { return g_sentCount; }
+    int cursorsReceived() { return g_gotCount; }
+
     void applyCursor(std::string const& id, std::string const& name, CCPoint position) {
+        // 세는 것을 맨 먼저 한다. 아래에서 걸러져도 "서버에서 오긴 왔다"는
+        // 사실은 남아야, 안 보이는 원인이 전달 문제인지 그리기 문제인지 갈린다.
+        ++g_gotCount;
+
         if (!Mod::get()->getSettingValue<bool>("show-cursors")) return;
 
         auto editor = LevelEditorLayer::get();

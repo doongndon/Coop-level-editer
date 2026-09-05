@@ -123,6 +123,12 @@ namespace coop {
     void clearCursors();
     // 한동안 소식 없는 커서를 치운다. 주기적으로 부른다.
     void fadeOldCursors();
+    // 커서를 몇 개 보내고 몇 개 받았는지.
+    int cursorsSent();
+    int cursorsReceived();
+
+    // 어디가 끊겼는지 한 줄로 보여준다. 화면에서 바로 보려고.
+    std::string diagnostics();
 
     // --- 모드 갱신 (Updater.cpp) ---
     //
