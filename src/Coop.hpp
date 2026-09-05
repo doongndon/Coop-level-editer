@@ -94,7 +94,13 @@ namespace coop {
     std::string levelSettingsString();
     int levelSongID();
     int levelAudioTrack();
-    void applyLevelSettings(std::string const& data, int songID, int audioTrack);
+    // 트리거로 바꿔 트는 곡들. "123,456" 처럼 번호가 이어져 있다.
+    std::string levelSongList();
+    void applyLevelSettings(
+        std::string const& data, int songID, int audioTrack, std::string const& songList
+    );
+    // 없는 곡을 한 곡씩 받아온다. 주기적으로 부른다.
+    void tickSongDownload();
     // 설정이 달라졌으면 방에 알린다. 주기적으로 부른다.
     void syncLevelSettings();
     // 방이나 레벨이 바뀌었다. 다음 설정은 같은 내용이라도 화면에 다시 반영한다.

@@ -1,8 +1,12 @@
 #include "Coop.hpp"
 
+#include <Geode/ui/Notification.hpp>
+
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -148,6 +152,40 @@ namespace {
 
     // 마지막으로 화면에 반영한 설정(색 제외). 같은 내용이면 다시 그리지 않는다.
     std::string g_appliedRest;
+
+    // --- 곡 내려받기 ---
+    //
+    // 방장이 쓰는 곡을 내가 안 갖고 있으면 번호만 맞고 소리는 나지 않는다.
+    // 그래서 없는 곡은 알아서 받아온다.
+    //
+    // MusicDownloadManager에는 "다 받았다"고 알려주는 델리게이트가 있지만
+    // 쓰지 않았다. 그걸 등록하려면 GD가 우리 객체의 메모리 배치를 자기 것과
+    // 똑같이 가정하게 되는데, 게임이 조금만 바뀌어도 엉뚱한 곳을 읽는다.
+    // 대신 이미 0.25초마다 돌고 있는 에디터 검사에서 상태만 물어본다.
+    std::vector<int> g_wantedSongs;
+    int g_songAttempts = 0;
+    int g_songWait = 0;
+    constexpr int MAX_SONG_ATTEMPTS = 3;
+    // 0.25초짜리 검사 12번 = 3초. 곡 하나 받을 시간을 준다.
+    constexpr int SONG_WAIT_TICKS = 12;
+
+    void queueSong(int id) {
+        if (id <= 0) return;
+        if (std::find(g_wantedSongs.begin(), g_wantedSongs.end(), id) != g_wantedSongs.end()) return;
+        g_wantedSongs.push_back(id);
+    }
+
+    // "123,456,789" 처럼 붙어 있는 곡 번호를 하나씩 꺼낸다.
+    void queueSongList(std::string const& text) {
+        size_t start = 0;
+        while (start < text.size()) {
+            auto comma = text.find(',', start);
+            auto piece = text.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            queueSong(std::atoi(piece.c_str()));
+            if (comma == std::string::npos) break;
+            start = comma + 1;
+        }
+    }
 }
 
 namespace coop {
@@ -190,9 +228,77 @@ namespace coop {
 
     void forgetAppliedSettings() {
         g_appliedRest.clear();
+        g_wantedSongs.clear();
+        g_songAttempts = 0;
+        g_songWait = 0;
     }
 
-    void applyLevelSettings(std::string const& data, int songID, int audioTrack) {
+    std::string levelSongList() {
+        auto editor = LevelEditorLayer::get();
+        return (editor && editor->m_level) ? std::string(editor->m_level->m_songIDs) : "";
+    }
+
+    // 받아야 할 곡이 있으면 한 곡씩 처리한다. 에디터 검사에서 주기적으로 부른다.
+    void tickSongDownload() {
+        if (g_wantedSongs.empty()) return;
+
+        // 검사는 0.25초마다 오지만 곡 하나 받는 데는 그보다 오래 걸린다.
+        // 매번 다시 시도하면 채 시작하기도 전에 실패로 몰아붙이게 된다.
+        if (g_songWait > 0) { --g_songWait; return; }
+
+        auto manager = MusicDownloadManager::sharedState();
+        if (!manager) return;
+
+        auto id = g_wantedSongs.front();
+
+        if (manager->isSongDownloaded(id)) {
+            // 원래 갖고 있던 곡이면 아무 말 없이 넘어간다.
+            // 우리가 받아온 곡일 때만 알린다.
+            if (g_songAttempts > 0) {
+                Notification::create(
+                    fmt::format("Song {} is ready", id), NotificationIcon::Success
+                )->show();
+            }
+            g_wantedSongs.erase(g_wantedSongs.begin());
+            g_songAttempts = 0;
+            return;
+        }
+
+        // 받는 중이면 기다린다.
+        if (manager->isRunningActionForSongID(id)) {
+            g_songWait = SONG_WAIT_TICKS;
+            return;
+        }
+
+        if (g_songAttempts >= MAX_SONG_ATTEMPTS) {
+            Notification::create(
+                fmt::format("Could not get song {} - add it yourself", id),
+                NotificationIcon::Warning
+            )->show();
+            g_wantedSongs.erase(g_wantedSongs.begin());
+            g_songAttempts = 0;
+            return;
+        }
+
+        if (g_songAttempts == 0) {
+            Notification::create(
+                fmt::format("Getting song {}...", id), NotificationIcon::Loading
+            )->show();
+        }
+        ++g_songAttempts;
+        g_songWait = SONG_WAIT_TICKS;
+
+        // 곡 정보를 아직 모르면 정보부터 받아야 내려받을 주소를 알 수 있다.
+        if (manager->getSongInfoObject(id)) {
+            manager->downloadSong(id);
+        } else {
+            manager->getSongInfo(id, true);
+        }
+    }
+
+    void applyLevelSettings(
+        std::string const& data, int songID, int audioTrack, std::string const& songList
+    ) {
         auto editor = LevelEditorLayer::get();
         if (!editor) return;
 
@@ -246,6 +352,13 @@ namespace coop {
                 level->m_songID = songID;
                 level->m_audioTrack = audioTrack;
             }
+            if (!songList.empty()) {
+                level->m_songIDs = songList;
+            }
+
+            // 없는 곡은 받아둔다. 번호만 맞춰놓으면 소리가 나지 않는다.
+            queueSong(songID);
+            queueSongList(songList);
         }
 
         // levelSettingsUpdated()는 배경과 바닥을 통째로 다시 그린다.

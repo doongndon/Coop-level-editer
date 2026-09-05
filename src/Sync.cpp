@@ -360,6 +360,7 @@ namespace coop {
         msg["data"] = text;
         msg["song"] = levelSongID();
         msg["track"] = levelAudioTrack();
+        msg["songs"] = levelSongList();
         send(std::move(msg));
     }
 
@@ -441,7 +442,8 @@ namespace coop {
             applyLevelSettings(
                 msg["data"].asString().unwrapOr(""),
                 static_cast<int>(msg["song"].asInt().unwrapOr(0)),
-                static_cast<int>(msg["track"].asInt().unwrapOr(0))
+                static_cast<int>(msg["track"].asInt().unwrapOr(0)),
+                msg["songs"].asString().unwrapOr("")
             );
             // 방금 받은 것을 내가 바꾼 것으로 착각해 되돌려 보내지 않도록 기록해둔다.
             g_lastSettings = levelSettingsString();

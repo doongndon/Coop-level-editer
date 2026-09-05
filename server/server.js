@@ -147,7 +147,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v4 (one shared level)";
+const SERVER_VERSION = "v5 (one shared level + songs)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -276,6 +276,8 @@ wss.on("connection", client => {
                     data: msg.data,
                     song: typeof msg.song === "number" ? msg.song : 0,
                     track: typeof msg.track === "number" ? msg.track : 0,
+                    // 트리거로 바꿔 트는 곡들. 받는 쪽이 없는 곡을 내려받는 데 쓴다.
+                    songs: typeof msg.songs === "string" ? msg.songs : "",
                 };
                 relay(room, client, room.settings);
                 return;
