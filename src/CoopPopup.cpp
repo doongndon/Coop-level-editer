@@ -85,12 +85,12 @@ bool CoopPopup::init() {
     updateMenu->setLayout(RowLayout::create());
     m_mainLayer->addChildAtPosition(updateMenu, Anchor::TopRight, ccp(-46.f, -24.f));
 
-    auto versionLabel = CCLabelBMFont::create(
-        fmt::format("v{}", coop::modVersion()).c_str(), "chatFont.fnt"
-    );
-    versionLabel->setScale(0.4f);
-    versionLabel->setOpacity(120);
-    m_mainLayer->addChildAtPosition(versionLabel, Anchor::TopLeft, ccp(34.f, -24.f));
+    // 모드와 서버가 각각 몇 번째 판인지. 둘 다 갱신됐는지 여기서 바로 보인다.
+    m_versionLabel = CCLabelBMFont::create("", "chatFont.fnt");
+    m_versionLabel->setScale(0.36f);
+    m_versionLabel->setOpacity(120);
+    m_versionLabel->setAnchorPoint({ 0.f, 0.5f });
+    m_mainLayer->addChildAtPosition(m_versionLabel, Anchor::TopLeft, ccp(14.f, -24.f));
 
     // --- 접속 상태 ---
     m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
@@ -169,6 +169,13 @@ void CoopPopup::tick(float) {
 
     if (m_updateButton) {
         m_updateButton->setEnabled(!coop::isUpdating());
+    }
+
+    if (m_versionLabel) {
+        auto server = coop::serverVersion();
+        m_versionLabel->setString(fmt::format(
+            "mod v{}   server {}", coop::modVersion(), server.empty() ? "?" : server
+        ).c_str());
     }
 
     // 방에 있을 때만 나가기를 누를 수 있다.

@@ -162,6 +162,10 @@ wss.on("connection", client => {
     client.clientId = String(nextClientId++);
     client.playerName = "Player";
 
+    // 서버가 몇 번째 판인지 먼저 알려준다. 모드가 창에 띄워주면
+    // 배포가 실제로 갱신됐는지 브라우저를 열지 않고도 알 수 있다.
+    sendTo(client, { type: "server", version: SERVER_VERSION });
+
     client.on("message", raw => {
         let msg;
         try {

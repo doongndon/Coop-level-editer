@@ -31,6 +31,8 @@ namespace coop {
     int peerCount();
     // 마지막 접속 실패 이유. 성공했거나 아직 시도 전이면 빈 문자열.
     std::string lastError();
+    // 서버가 알려준 자기 버전. 배포가 갱신됐는지 창에서 바로 보려고.
+    std::string serverVersion();
 
     // 이 사람의 GD 계정 이름.
     std::string defaultPlayerName();

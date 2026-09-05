@@ -20,6 +20,7 @@ protected:
     CCMenuItemSpriteExtra* m_leaveButton = nullptr;
     CCMenuItemSpriteExtra* m_updateButton = nullptr;
     cocos2d::CCLabelBMFont* m_whereLabel = nullptr;
+    cocos2d::CCLabelBMFont* m_versionLabel = nullptr;
     cocos2d::CCLabelBMFont* m_emptyLabel = nullptr;
     cocos2d::CCLabelBMFont* m_statusLabel = nullptr;
     std::string m_shownRooms;

@@ -31,6 +31,9 @@ namespace {
     // 실제로 들어간 방만 여기 들어간다. 이 둘을 섞어 쓴 것이 지난번 혼선의 원인이었다.
     std::string g_currentRoom;
 
+    // 서버가 알려준 자기 버전. 배포가 갱신됐는지 창에서 바로 보려고 받아둔다.
+    std::string g_serverVersion;
+
     // 아직 접속 전에 "방 만들기"를 누른 경우. 연결되면 들어가기 대신 만들기를 보낸다.
     std::atomic<bool> g_createOnConnect = false;
 
@@ -143,6 +146,11 @@ namespace {
         Loader::get()->queueInMainThread([value = std::move(parsed).unwrap()]() {
             auto type = value["type"].asString().unwrapOr("");
 
+            if (type == "server") {
+                g_serverVersion = value["version"].asString().unwrapOr("");
+                return;
+            }
+
             if (type == "peers") {
                 g_peerCount = static_cast<int>(value["count"].asInt().unwrapOr(0));
                 return;
@@ -248,6 +256,7 @@ namespace coop {
         g_peerCount = 0;
         // 서버가 방을 확인해주기 전까지는 방 밖이다.
         g_currentRoom.clear();
+        g_serverVersion.clear();
 
         if (url.empty()) {
             g_state = State::Disconnected;
@@ -287,6 +296,10 @@ namespace coop {
     std::string lastError() {
         std::lock_guard lock(g_errorMutex);
         return g_lastError;
+    }
+
+    std::string serverVersion() {
+        return g_serverVersion;
     }
 
     void send(matjson::Value msg) {
