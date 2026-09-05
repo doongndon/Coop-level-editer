@@ -107,12 +107,20 @@ void CoopPopup::updateStatus(float) {
             m_statusLabel->setColor(peers > 0 ? ccColor3B{ 90, 255, 90 } : ccColor3B{ 255, 220, 90 });
             break;
         }
-        case coop::State::Connecting:
-            m_statusLabel->setString("Connecting...");
+        case coop::State::Connecting: {
+            // 실패 이유가 있으면 그대로 보여준다. "연결 중"만 계속 떠 있으면
+            // 서버가 꺼진 건지 주소가 틀린 건지 알 방법이 없다.
+            auto error = coop::lastError();
+            if (error.empty()) {
+                m_statusLabel->setString("Connecting...");
+            } else {
+                m_statusLabel->setString(error.c_str());
+            }
             m_statusLabel->setColor({ 255, 220, 90 });
             break;
+        }
         case coop::State::Disconnected:
-            m_statusLabel->setString("Not connected - check the address");
+            m_statusLabel->setString("Not connected - enter an address");
             m_statusLabel->setColor({ 255, 110, 110 });
             break;
     }

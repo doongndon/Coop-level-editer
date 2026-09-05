@@ -4,6 +4,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <mutex>
+#include <string>
 
 using namespace geode::prelude;
 
@@ -11,6 +13,17 @@ namespace {
     ix::WebSocket g_socket;
     std::atomic<coop::State> g_state = coop::State::Disconnected;
     std::atomic<int> g_peerCount = 0;
+
+    // 접속이 왜 실패했는지. 소켓 스레드가 쓰고 화면 쪽에서 읽는다.
+    // 이게 없으면 서버가 꺼졌든 주소가 틀렸든 전부 "연결 중"으로만 보여서
+    // 무엇을 고쳐야 할지 알 수가 없다.
+    std::mutex g_errorMutex;
+    std::string g_lastError;
+
+    void setLastError(std::string reason) {
+        std::lock_guard lock(g_errorMutex);
+        g_lastError = std::move(reason);
+    }
 
     std::string settingString(char const* key) {
         return Mod::get()->getSettingValue<std::string>(key);
@@ -45,15 +58,27 @@ namespace {
         switch (msg->type) {
             case ix::WebSocketMessageType::Open:
                 g_state = coop::State::Connected;
+                setLastError("");
                 // 연결이 (재)성사될 때마다 방에 다시 들어간다. 여기서 보내야
                 // 연결되기 전에 join이 유실되는 걸 막을 수 있다.
                 sendJoin();
                 return;
 
-            case ix::WebSocketMessageType::Close:
             case ix::WebSocketMessageType::Error:
                 g_state = coop::State::Connecting;
                 g_peerCount = 0;
+                setLastError(msg->errorInfo.reason);
+                log::warn("접속 실패: {}", msg->errorInfo.reason);
+                return;
+
+            case ix::WebSocketMessageType::Close:
+                g_state = coop::State::Connecting;
+                g_peerCount = 0;
+                setLastError(
+                    msg->closeInfo.reason.empty()
+                        ? fmt::format("연결이 끊어졌습니다 ({})", msg->closeInfo.code)
+                        : msg->closeInfo.reason
+                );
                 return;
 
             case ix::WebSocketMessageType::Message:
@@ -116,6 +141,11 @@ namespace coop {
 
     int peerCount() {
         return g_peerCount;
+    }
+
+    std::string lastError() {
+        std::lock_guard lock(g_errorMutex);
+        return g_lastError;
     }
 
     void send(matjson::Value msg) {

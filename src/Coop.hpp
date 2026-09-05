@@ -28,6 +28,8 @@ namespace coop {
     State state();
     // 같은 방에 있는 다른 사람 수(나 제외). 서버가 알려준 값.
     int peerCount();
+    // 마지막 접속 실패 이유. 성공했거나 아직 시도 전이면 빈 문자열.
+    std::string lastError();
     // 연결돼 있을 때만 실제로 보낸다.
     void send(matjson::Value msg);
 
