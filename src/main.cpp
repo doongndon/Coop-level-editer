@@ -2,14 +2,35 @@
 
 using namespace geode::prelude;
 
+namespace {
+    // 예전 버전에서는 서버 주소를 직접 쳐 넣게 되어 있었고, 입력칸이 : 와 . 를
+    // 걸러버리는 문제가 있었다. 그래서 "WSSCOOPLEVELEDITERONRENDERCOM" 같은
+    // 망가진 값이 저장에 남아 있을 수 있다.
+    //
+    // 저장된 값은 mod.json의 기본값보다 우선하므로, 새 기본값을 넣어도
+    // 그 사람에게는 적용되지 않는다. 그래서 여기서 한 번 고쳐준다.
+    // 점이 하나도 없는 주소는 정상적인 주소일 수가 없다.
+    void repairServerUrl() {
+        auto url = Mod::get()->getSettingValue<std::string>("server-url");
+        if (url.find('.') != std::string::npos) return;
+
+        if (auto setting = Mod::get()->getSetting("server-url")) {
+            setting->reset();
+            log::info("망가진 서버 주소 \"{}\" 를 기본값으로 되돌렸습니다", url);
+        }
+    }
+}
+
 $on_mod(Loaded) {
+    repairServerUrl();
     coop::connect();
 
-    // 설정 화면에서 서버 주소나 방 이름을 바꾸면 곧바로 다시 연결한다.
+    // 설정 화면에서 서버 주소를 바꾸면 곧바로 다시 연결한다.
     listenForSettingChanges<std::string>("server-url", [](std::string) {
         coop::connect();
     });
-    listenForSettingChanges<std::string>("room-name", [](std::string) {
-        coop::connect();
-    });
+
+    // room-name은 감시하지 않는다. 이 값은 모드가 방에 들어갈 때마다 스스로
+    // 적어 넣기 때문에, 여기서 다시 연결하면 방을 바꿀 때마다 접속이 끊기고
+    // 심하면 접속 -> 저장 -> 접속이 끝없이 반복된다.
 }
