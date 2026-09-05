@@ -26,14 +26,14 @@ void sendObjectAdded(int objectId, float x, float y) {
     msg["x"] = x;
     msg["y"] = y;
 
-    g_socket.send(msg.dump());
+    g_socket.send(msg.dump(matjson::NO_INDENTATION));
 }
 
 void sendJoin() {
     matjson::Value joinMsg;
     joinMsg["type"] = "join";
     joinMsg["room"] = getRoomName();
-    g_socket.send(joinMsg.dump());
+    g_socket.send(joinMsg.dump(matjson::NO_INDENTATION));
 }
 
 void connectToServer() {
@@ -67,7 +67,7 @@ void connectToServer() {
                 if (!editor || !editor->m_editorUI) return;
 
                 g_applyingRemoteEvent = true;
-                editor->m_editorUI->createObject(objectId, {x, y}, false);
+                editor->m_editorUI->createObject(objectId, {x, y});
                 g_applyingRemoteEvent = false;
             });
         }
@@ -80,9 +80,10 @@ void connectToServer() {
 
 // 에디터에서 오브젝트를 놓는 함수를 후킹해서, 놓일 때마다 서버로 전송
 class $modify(CoopEditorUI, EditorUI) {
-    void createObject(int objectId, cocos2d::CCPoint pos, bool p2) {
-        EditorUI::createObject(objectId, pos, p2);
-        sendObjectAdded(objectId, pos.x, pos.y);
+    GameObject* createObject(int objectID, cocos2d::CCPoint position) {
+        auto obj = EditorUI::createObject(objectID, position);
+        sendObjectAdded(objectID, position.x, position.y);
+        return obj;
     }
 };
 
@@ -90,10 +91,10 @@ $on_mod(Loaded) {
     connectToServer();
 
     // 설정 화면에서 서버 주소나 방 이름을 바꾸면 자동으로 다시 연결
-    listenForSettingChanges("server-url", [](std::string) {
+    listenForSettingChanges<std::string>("server-url", [](std::string) {
         connectToServer();
     });
-    listenForSettingChanges("room-name", [](std::string) {
+    listenForSettingChanges<std::string>("room-name", [](std::string) {
         connectToServer();
     });
 }

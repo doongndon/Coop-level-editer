@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -31,22 +32,6 @@ jobs:
           rm -f CMakeCache.txt
         continue-on-error: true
 
-      - name: Use older, compatible Android NDK
-        if: runner.os == 'Linux'
-        id: setup-ndk
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r27c
-          add-to-path: true
-
-      - name: Point geode-sdk build action at the r27c NDK
-        # geode-sdk/build-geode-mod은 android-ndk-version 입력이 없으면
-        # $ANDROID_NDK_LATEST_HOME(러너에 기본 설치된 최신 NDK)을 그대로 써버려서,
-        # 위에서 설치한 r27c가 무시되고 있었음. 환경변수를 직접 덮어써서 강제 적용.
-        if: runner.os == 'Linux'
-        shell: bash
-        run: echo "ANDROID_NDK_LATEST_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
-
       - name: Create build directory
         shell: bash
         run: mkdir -p build
@@ -57,9 +42,6 @@ jobs:
           target: ${{ matrix.target }}
         env:
           CMAKE_SUPPRESS_DEVELOPER_WARNINGS: "ON"
-          # 최신 CMake는 너무 오래된 cmake_minimum_required(3.5 미만)를 요구하는
-          # 의존성(result 등)을 거부함 - 최소 정책 버전을 지정해 우회
-          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
       - name: Upload result
         uses: actions/upload-artifact@v4
