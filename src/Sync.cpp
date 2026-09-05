@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -33,10 +34,18 @@ namespace {
     std::unordered_set<int> g_notShared;
     bool g_needBaseline = true;
 
+    // 방금 만들어진 오브젝트들.
+    //
+    // 게임이 오브젝트를 만드는 도중에 그 내용을 읽으면 아직 준비가 덜 된 상태를
+    // 건드리게 된다. 하나씩 놓을 때는 티가 안 나지만 빠르게 연속으로 놓으면
+    // 크래시가 난다. 그래서 훅에서는 목록에만 담아두고, 게임 일이 끝난 뒤
+    // 다음 검사 때 실제로 읽는다.
+    std::vector<Ref<GameObject>> g_pending;
+
     // 레벨이 클 수 있으니 한 번에 전부 훑지 않고 조금씩 나눠서 본다.
     // 한 프레임에 몰리면 게임이 끊기기 때문.
     unsigned int g_scanIndex = 0;
-    constexpr unsigned int SCAN_SLICE = 250;
+    constexpr unsigned int SCAN_SLICE = 60;
 
     bool g_applyingRemote = false;
 
@@ -212,6 +221,8 @@ namespace {
     // 이 오브젝트를 한 번 살펴본다.
     void inspect(LevelEditorLayer* editor, GameObject* object) {
         if (!object) return;
+        // 이미 레벨에서 떨어져 나간 오브젝트는 읽지 않는다.
+        if (!object->getParent()) return;
 
         auto known = g_uidByLocalId.find(object->m_uniqueID);
         if (known == g_uidByLocalId.end()) {
@@ -236,6 +247,7 @@ namespace coop {
         g_objectByUid.clear();
         g_lastSaved.clear();
         g_notShared.clear();
+        g_pending.clear();
         g_scanIndex = 0;
 
         // 레벨 오브젝트는 아직 다 불러오지 않았을 수 있다.
@@ -252,6 +264,15 @@ namespace coop {
 
         auto editor = LevelEditorLayer::get();
         if (!editor || !editor->m_objects) return;
+
+        // 훅에서 담아둔 새 오브젝트를 게임 일이 끝난 지금 처리한다.
+        if (!g_pending.empty()) {
+            auto pending = std::move(g_pending);
+            g_pending.clear();
+            for (auto& held : pending) {
+                inspect(editor, held.data());
+            }
+        }
 
         auto objects = editor->m_objects;
         auto total = objects->count();
@@ -295,11 +316,8 @@ namespace coop {
 
     void noticeObject(GameObject* object) {
         if (g_applyingRemote || g_needBaseline || !object) return;
-
-        auto editor = LevelEditorLayer::get();
-        if (!editor) return;
-
-        inspect(editor, object);
+        // 여기서 바로 읽지 않는다. 위 g_pending 설명 참고.
+        g_pending.push_back(object);
     }
 
     void shareExistingLevel() {
