@@ -120,10 +120,12 @@ namespace {
         if (!positionDiffers) return false;
         if (!newValues.contains("2") || !newValues.contains("3")) return false;
 
-        outPosition = {
+        // CCPoint는 CCSize로부터의 대입 연산자도 갖고 있어서 중괄호로 넘기면
+        // 어느 쪽인지 모호해진다. 형을 분명히 적어준다.
+        outPosition = cocos2d::CCPoint(
             std::strtof(newValues["2"].c_str(), nullptr),
-            std::strtof(newValues["3"].c_str(), nullptr),
-        };
+            std::strtof(newValues["3"].c_str(), nullptr)
+        );
         return true;
     }
 
