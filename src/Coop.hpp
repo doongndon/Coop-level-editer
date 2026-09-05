@@ -167,6 +167,9 @@ namespace coop {
     void addChatLine(std::string const& who, std::string const& text);
     void clearChat();
     std::vector<std::string> chatLines();
+    // 창을 닫아둔 사이에 온 줄 수. 에디터 버튼에 숫자로 띄운다.
+    int unreadChat();
+    void markChatRead();
 
     // 어디가 끊겼는지 한 줄로 보여준다. 화면에서 바로 보려고.
     std::string diagnostics();

@@ -16,6 +16,9 @@ namespace {
     std::deque<std::string> g_lines;
     constexpr std::size_t KEEP = 8;
 
+    // 창을 닫아둔 사이에 온 줄 수. 에디터 버튼에 숫자로 띄운다.
+    int g_unread = 0;
+
     // 이 글꼴이 그릴 수 있는 글자만 남긴다.
     std::string keepDrawable(std::string const& text) {
         std::string out;
@@ -52,6 +55,7 @@ namespace coop {
     void addChatLine(std::string const& who, std::string const& text) {
         g_lines.push_back(fmt::format("{}: {}", who, text));
         while (g_lines.size() > KEEP) g_lines.pop_front();
+        ++g_unread;
 
         // 창을 닫아둔 채로도 왔다는 것은 알아야 한다.
         if (Mod::get()->getSettingValue<bool>("show-notifications")) {
@@ -61,6 +65,15 @@ namespace coop {
 
     void clearChat() {
         g_lines.clear();
+        g_unread = 0;
+    }
+
+    int unreadChat() {
+        return g_unread;
+    }
+
+    void markChatRead() {
+        g_unread = 0;
     }
 
     // 최근 몇 줄을 한 덩어리로. 창에서 그대로 띄운다.

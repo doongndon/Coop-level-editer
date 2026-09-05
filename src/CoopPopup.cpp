@@ -374,6 +374,7 @@ bool CoopChatPopup::init() {
     note->setOpacity(120);
     m_mainLayer->addChildAtPosition(note, Anchor::Bottom, ccp(0.f, 14.f));
 
+    coop::markChatRead();
     this->tick(0.f);
     this->schedule(schedule_selector(CoopChatPopup::tick), 0.5f);
     return true;

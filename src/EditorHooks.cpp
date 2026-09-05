@@ -3,6 +3,8 @@
 
 #include <Geode/modify/EditorUI.hpp>
 
+#include <functional>
+
 using namespace geode::prelude;
 
 // 에디터 화면 위쪽에 접속 상태를 보여준다.
@@ -13,7 +15,21 @@ class $modify(CoopEditorUI, EditorUI) {
         CCLabelBMFont* m_status = nullptr;
         CCMenuItemSpriteExtra* m_button = nullptr;
         CCMenu* m_menu = nullptr;
+        // 채팅과 화면 따라가기는 편집 중에 자주 쓰는 것이라 창 안에 묻어두면
+        // 매번 두 번 눌러야 한다. 위쪽 줄에 같이 놔둔다.
+        CCLabelBMFont* m_chatLabel = nullptr;
+        CCMenuItemSpriteExtra* m_chatButton = nullptr;
+        CCMenuItemSpriteExtra* m_followButton = nullptr;
     };
+
+    // 위쪽 줄에 들어갈 작은 버튼. 화면을 가리지 않도록 글자만 쓴다.
+    CCMenuItemSpriteExtra* makeSmallButton(
+        CCLabelBMFont* label, std::function<void(CCMenuItemSpriteExtra*)> action
+    ) {
+        label->setScale(0.3f);
+        label->setOpacity(200);
+        return CCMenuItemExt::createSpriteExtra(label, std::move(action));
+    }
 
     bool init(LevelEditorLayer* editorLayer) {
         if (!EditorUI::init(editorLayer)) return false;
@@ -33,12 +49,32 @@ class $modify(CoopEditorUI, EditorUI) {
 
         m_fields->m_button = button;
 
+        // 채팅. 안 읽은 줄이 있으면 개수가 붙는다.
+        m_fields->m_chatLabel = CCLabelBMFont::create("CHAT", "bigFont.fnt");
+        m_fields->m_chatButton = this->makeSmallButton(
+            m_fields->m_chatLabel,
+            [](CCMenuItemSpriteExtra*) {
+                if (auto popup = CoopChatPopup::create()) popup->show();
+            }
+        );
+
+        // 상대가 보고 있는 자리로 화면을 옮긴다.
+        m_fields->m_followButton = this->makeSmallButton(
+            CCLabelBMFont::create("GO TO", "bigFont.fnt"),
+            [](CCMenuItemSpriteExtra*) {
+                if (coop::hasPeerView()) coop::goToPeerView();
+            }
+        );
+
         auto menu = CCMenu::create();
-        menu->setContentSize({ 260.f, 22.f });
+        menu->setContentSize({ 420.f, 22.f });
         menu->addChild(button);
+        menu->addChild(m_fields->m_chatButton);
+        menu->addChild(m_fields->m_followButton);
         // setLayout을 부르면 Geode가 CCMenu의 기준점 무시 설정을 꺼서
         // 자리 계산이 상식대로 동작한다. 직접 좌표를 잡으면 어긋난다.
-        menu->setLayout(RowLayout::create());
+        // 숨긴 버튼이 자리를 차지하면 남은 것들이 한쪽으로 밀린다.
+        menu->setLayout(RowLayout::create()->setGap(14.f)->ignoreInvisibleChildren(true));
         menu->setZOrder(1000);
 
         auto winSize = CCDirector::get()->getWinSize();
@@ -78,6 +114,14 @@ class $modify(CoopEditorUI, EditorUI) {
         return true;
     }
 
+    // 글자가 바뀌면 누를 수 있는 범위도 같이 맞춰줘야 한다.
+    void fitButton(CCMenuItemSpriteExtra* button, CCLabelBMFont* label) {
+        if (!button || !label) return;
+        auto size = label->getScaledContentSize();
+        button->setContentSize(size);
+        label->setPosition(cocos2d::CCPoint(size.width / 2.f, size.height / 2.f));
+    }
+
     void updateCoopStatus() {
         auto label = m_fields->m_status;
         if (!label) return;
@@ -108,15 +152,28 @@ class $modify(CoopEditorUI, EditorUI) {
                 break;
         }
 
-        // 글자가 바뀌면 버튼 크기도 같이 맞춰야 누를 수 있는 범위가 어긋나지 않는다.
-        if (auto button = m_fields->m_button) {
-            auto size = label->getScaledContentSize();
-            button->setContentSize(size);
-            label->setPosition(cocos2d::CCPoint(size.width / 2.f, size.height / 2.f));
+        // 채팅과 따라가기는 방에 있을 때만 쓸모가 있다. 혼자일 때 띄워두면
+        // 편집 화면만 가린다.
+        auto inRoom = coop::inRoom();
+        if (auto chat = m_fields->m_chatButton) chat->setVisible(inRoom);
+        if (auto follow = m_fields->m_followButton) {
+            follow->setVisible(inRoom && coop::hasPeerView());
+        }
 
-            if (auto menu = m_fields->m_menu) {
-                menu->updateLayout();
-            }
+        if (auto chatLabel = m_fields->m_chatLabel) {
+            auto unread = coop::unreadChat();
+            chatLabel->setString(
+                unread > 0 ? fmt::format("CHAT ({})", unread).c_str() : "CHAT"
+            );
+            chatLabel->setColor(unread > 0 ? ccColor3B{ 255, 220, 90 } : ccColor3B{ 255, 255, 255 });
+            this->fitButton(m_fields->m_chatButton, chatLabel);
+        }
+
+        // 글자가 바뀌면 버튼 크기도 같이 맞춰야 누를 수 있는 범위가 어긋나지 않는다.
+        this->fitButton(m_fields->m_button, label);
+
+        if (auto menu = m_fields->m_menu) {
+            menu->updateLayout();
         }
     }
 
