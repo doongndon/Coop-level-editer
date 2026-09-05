@@ -12,6 +12,7 @@ class $modify(CoopEditorUI, EditorUI) {
     struct Fields {
         CCLabelBMFont* m_status = nullptr;
         CCMenuItemSpriteExtra* m_button = nullptr;
+        CCMenu* m_menu = nullptr;
     };
 
     bool init(LevelEditorLayer* editorLayer) {
@@ -33,13 +34,18 @@ class $modify(CoopEditorUI, EditorUI) {
         m_fields->m_button = button;
 
         auto menu = CCMenu::create();
+        menu->setContentSize({ 260.f, 22.f });
         menu->addChild(button);
+        // setLayout을 부르면 Geode가 CCMenu의 기준점 무시 설정을 꺼서
+        // 자리 계산이 상식대로 동작한다. 직접 좌표를 잡으면 어긋난다.
+        menu->setLayout(RowLayout::create());
         menu->setZOrder(1000);
 
         auto winSize = CCDirector::get()->getWinSize();
-        menu->setPosition({ winSize.width / 2.f, winSize.height - 10.f });
+        menu->setPosition({ winSize.width / 2.f, winSize.height - 14.f });
 
         this->addChild(menu);
+        m_fields->m_menu = menu;
 
         coop::enterEditor();
         this->updateCoopStatus();
@@ -72,8 +78,13 @@ class $modify(CoopEditorUI, EditorUI) {
 
         // 글자가 바뀌면 버튼 크기도 같이 맞춰야 누를 수 있는 범위가 어긋나지 않는다.
         if (auto button = m_fields->m_button) {
-            button->setContentSize(label->getScaledContentSize());
-            label->setPosition(button->getContentSize() / 2.f);
+            auto size = label->getScaledContentSize();
+            button->setContentSize(size);
+            label->setPosition(cocos2d::CCPoint(size.width / 2.f, size.height / 2.f));
+
+            if (auto menu = m_fields->m_menu) {
+                menu->updateLayout();
+            }
         }
     }
 

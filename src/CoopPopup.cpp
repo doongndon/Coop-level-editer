@@ -53,25 +53,22 @@ bool CoopPopup::init() {
     m_mainLayer->addChildAtPosition(m_roomInput, Anchor::Top, ccp(0.f, -124.f));
 
     // 버튼들.
-    // CCMenu는 기준점이 한가운데라, 자식 좌표는 메뉴 자신의 상자 안(0~너비) 기준이고
-    // 메뉴 자체는 가운데가 지정한 자리에 오도록 놓인다.
+    // 자리 계산은 직접 하지 않고 레이아웃에 맡긴다. CCMenu는 기본적으로
+    // 기준점을 무시하고 자식을 배치하는데, setLayout을 부르면 Geode가 그 설정을
+    // 꺼주기 때문에 좌표가 상식적으로 동작한다.
     auto menu = CCMenu::create();
     menu->setContentSize({ 300.f, 40.f });
 
-    auto randomBtn = CCMenuItemExt::createSpriteExtra(
+    menu->addChild(CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("New Room", "bigFont.fnt", "GJ_button_05.png", 0.7f),
         [this](CCMenuItemSpriteExtra*) { this->onRandomRoom(nullptr); }
-    );
-    randomBtn->setPosition({ 85.f, 20.f });
-    menu->addChild(randomBtn);
-
-    auto joinBtn = CCMenuItemExt::createSpriteExtra(
+    ));
+    menu->addChild(CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("Join", "bigFont.fnt", "GJ_button_01.png", 0.7f),
         [this](CCMenuItemSpriteExtra*) { this->onJoin(nullptr); }
-    );
-    joinBtn->setPosition({ 215.f, 20.f });
-    menu->addChild(joinBtn);
+    ));
 
+    menu->setLayout(RowLayout::create()->setGap(20.f));
     m_mainLayer->addChildAtPosition(menu, Anchor::Bottom, ccp(0.f, 62.f));
 
     // 이미 만들어둔 레벨을 방에 올리는 버튼.
@@ -80,13 +77,12 @@ bool CoopPopup::init() {
     auto shareMenu = CCMenu::create();
     shareMenu->setContentSize({ 300.f, 30.f });
 
-    auto shareBtn = CCMenuItemExt::createSpriteExtra(
+    shareMenu->addChild(CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("Share My Level", "bigFont.fnt", "GJ_button_04.png", 0.6f),
         [this](CCMenuItemSpriteExtra*) { this->onShareLevel(nullptr); }
-    );
-    shareBtn->setPosition({ 150.f, 15.f });
-    shareMenu->addChild(shareBtn);
+    ));
 
+    shareMenu->setLayout(RowLayout::create());
     m_mainLayer->addChildAtPosition(shareMenu, Anchor::Bottom, ccp(0.f, 34.f));
 
     // 접속 상태
