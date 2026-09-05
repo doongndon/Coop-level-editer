@@ -9,7 +9,6 @@
     "name": "Coop Level Editor",
     "developer": "yourname",
     "description": "Edit levels together in real time",
-    "dependencies": [],
     "settings": {
         "server-url": {
             "name": "Server Address",
