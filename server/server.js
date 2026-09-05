@@ -133,9 +133,14 @@ function sweepRooms() {
 
 setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
+// 브라우저로 주소를 열었을 때 보이는 화면.
+// 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
+const SERVER_VERSION = "v3 (explicit rooms)";
+
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end(`중계 서버 동작 중 - 방 ${rooms.size}개\n`);
+    const names = [...rooms.keys()].map(n => ` - ${n} (${rooms.get(n).clients.size}명)`).join("\n");
+    res.end(`중계 서버 동작 중 ${SERVER_VERSION}\n방 ${rooms.size}개\n${names}\n`);
 });
 
 const wss = new WebSocketServer({ server: httpServer });
