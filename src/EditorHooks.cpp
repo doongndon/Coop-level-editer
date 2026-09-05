@@ -50,7 +50,8 @@ class $modify(CoopEditorUI, EditorUI) {
         coop::clearCursors();
         coop::enterEditor();
 
-        // 설정에서 꺼두지 않았으면 에디터에 들어올 때 알아서 접속한다.
+        // 설정에서 꺼두지 않았으면 에디터에 들어올 때 서버에 알아서 접속한다.
+        // 접속만 할 뿐 방에는 들어가지 않는다. 방은 사용자가 고른다.
         if (Mod::get()->getSettingValue<bool>("auto-join")
             && coop::state() == coop::State::Disconnected) {
             coop::connect();
@@ -68,6 +69,14 @@ class $modify(CoopEditorUI, EditorUI) {
 
         switch (coop::state()) {
             case coop::State::Connected: {
+                // 접속만 됐다고 같이 편집되는 게 아니다. 방에 들어가야 한다.
+                // 그 차이를 여기서 분명히 보여줘야 헷갈리지 않는다.
+                if (!coop::inRoom()) {
+                    label->setString("COOP - TAP TO PICK A ROOM");
+                    label->setColor({ 255, 180, 90 });
+                    break;
+                }
+
                 auto peers = coop::peerCount();
                 label->setString(fmt::format("COOP ON - {} PARTNER(S)", peers).c_str());
                 // 혼자면 노란색, 상대가 있으면 초록색

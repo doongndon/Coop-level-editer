@@ -34,18 +34,31 @@ namespace coop {
 
     // 이 사람의 GD 계정 이름.
     std::string defaultPlayerName();
-    // 지금 들어가 있는 방 이름.
-    std::string currentRoom();
-    // 이 사람의 기본 방 이름. 계정 이름을 따서 만든다.
-    std::string defaultRoomName();
-    // 방을 바꾸고 다시 접속한다.
-    void joinRoom(std::string room);
 
-    // 열려 있는 방 목록을 서버에 요청한다. 답이 오면 목록이 채워진다.
+    // 방은 "만들기"로만 생긴다. 들어가기는 이미 있는 방에만 된다.
+    // 예전처럼 들어가는 것만으로 방이 생기면 목록과 실제 방이 어긋나서
+    // 서로 다른 방에 들어가 놓고 같은 방인 줄 아는 일이 생긴다.
+
+    // 지금 들어가 있는 방. 서버가 확인해준 이름만 들어간다. 방 밖이면 빈 문자열.
+    std::string currentRoom();
+    bool inRoom();
+    // 방 이름 칸에 미리 채워줄 이름. 계정 이름을 따서 만든다.
+    std::string suggestedRoomName();
+
+    // 새 방을 만들고 바로 들어간다. 만들어진 방은 목록에 올라간다.
+    void createRoom(std::string room);
+    // 이미 있는 방에 들어간다. 없는 방이면 서버가 거절한다.
+    void joinRoom(std::string room);
+    // 방에서 나온다. 접속은 유지해서 목록은 계속 볼 수 있다.
+    void leaveRoom();
+
+    // 방 목록을 서버에 요청한다. 답이 오면 목록이 채워진다.
     void requestRoomList();
     struct RoomEntry {
         std::string name;
         int count = 0;
+        std::string owner;
+        int objects = 0;
     };
     std::vector<RoomEntry> roomList();
     // 연결돼 있을 때만 실제로 보낸다.

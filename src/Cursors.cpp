@@ -62,6 +62,7 @@ namespace {
 namespace coop {
 
     void sendCursor(CCPoint position) {
+        if (!inRoom()) return;
         if (!Mod::get()->getSettingValue<bool>("show-cursors")) return;
 
         auto now = std::chrono::steady_clock::now();

@@ -274,6 +274,14 @@ namespace coop {
     void reconcile() {
         if (g_applyingRemote) return;
 
+        // 방 밖에서는 아무것도 보내지 않는다. 보내지도 않으면서 "보냈다"고
+        // 기록해두면, 나중에 방에 들어갔을 때 그 오브젝트들이 영영 전달되지 않는다.
+        if (!inRoom()) {
+            g_pending.clear();
+            g_needBaseline = true;
+            return;
+        }
+
         auto editor = LevelEditorLayer::get();
         if (!editor || !editor->m_objects) return;
 
