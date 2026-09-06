@@ -45,8 +45,10 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
         auto size = CCDirector::get()->getWinSize();
         auto spot = Mod::get()->getSettingValue<std::string>("browser-spot");
 
-        auto left = 62.f;
-        auto right = size.width - 62.f;
+        // 화면 가장자리에 최대한 붙인다. 이 화면 왼쪽 줄에는 GD 버튼들이
+        // 안쪽으로 한 칸 들어와 있어서, 바깥쪽 끝이 제일 안전하다.
+        auto left = 38.f;
+        auto right = size.width - 38.f;
 
         if (spot == "top-left") return { left, size.height - 26.f };
         if (spot == "top-right") return { right, size.height - 26.f };
