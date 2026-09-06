@@ -340,10 +340,20 @@ namespace {
         auto created = editor->createObjectsFromString(data, true, true);
         if (!created || created->count() == 0) return nullptr;
 
-        for (unsigned int i = 0; i < created->count(); ++i) {
-            g_present.insert(static_cast<GameObject*>(created->objectAtIndex(i)));
+        auto first = static_cast<GameObject*>(created->objectAtIndex(0));
+        g_present.insert(first);
+
+        // 하나를 만들라고 했는데 여럿이 나오면, 나머지는 짝을 지어줄 uid가 없다.
+        // 그대로 두면 레벨에만 남아 있다가 다음 검사에서 "처음 보는 것"으로
+        // 보여 방에 새로 올라가고, 결국 물건이 불어난다. 첫 개만 남긴다.
+        for (unsigned int i = 1; i < created->count(); ++i) {
+            auto extra = static_cast<GameObject*>(created->objectAtIndex(i));
+            if (!extra) continue;
+            g_present.insert(extra);
+            letGoOf(editor, extra);
+            editor->removeObject(extra, true);
         }
-        return static_cast<GameObject*>(created->objectAtIndex(0));
+        return first;
     }
 
     // 서버가 알려준 오브젝트 상태를 내 레벨에 반영한다.
@@ -530,6 +540,26 @@ namespace {
                 // 그럴 때는 하나씩 다시 만든다. 느리지만 어긋나는 것보다 낫다.
                 log::warn("묶음 생성이 어긋났습니다 ({} 요청, {} 생성). 하나씩 다시 만듭니다",
                           fresh.size(), made);
+
+                // 다시 만들기 전에, 묶음으로 만들어진 것들을 먼저 치운다.
+                //
+                // 이걸 안 해서 물건이 몇 배로 불어나고 있었다. 묶음이 어긋나면
+                // 만들어진 것들은 uid를 못 받은 채 레벨에 그대로 남는데, 곧바로
+                // 아래에서 같은 내용을 또 만든다. 한 번 어긋날 때마다 그만큼씩
+                // 쌓인다. 실제로 한쪽은 110개, 다른 쪽은 330개가 됐다.
+                //
+                // 짝을 못 지은 물건은 다음 검사에서 "처음 보는 것"으로 보여
+                // 방에 새로 올라가기까지 한다. 반드시 치우고 시작해야 한다.
+                if (created) {
+                    for (unsigned int k = 0; k < created->count(); ++k) {
+                        auto object = static_cast<GameObject*>(created->objectAtIndex(k));
+                        if (!object) continue;
+                        g_present.insert(object);
+                        letGoOf(editor, object);
+                        editor->removeObject(object, true);
+                    }
+                }
+
                 for (auto index : fresh) {
                     auto const& [uid, data] = g_incoming[index];
                     applyState(editor, uid, data);
