@@ -4,7 +4,7 @@
         "win": "2.2081",
         "android": "2.2081"
     },
-    "version": "v0.18.0",
+    "version": "v0.19.0",
     "id": "com.yourname.coopedit",
     "name": "Coop Level Editor",
     "developer": "yourname",
@@ -57,6 +57,19 @@
                 "bottom-left",
                 "bottom-right",
                 "top-center"
+            ]
+        },
+        "browser-spot": {
+            "name": "Levels List Button Spot",
+            "description": "Where the COOP button sits on the My Levels screen. Pick whichever corner is free on your screen.",
+            "type": "string",
+            "default": "left-middle",
+            "one-of": [
+                "left-middle",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
             ]
         }
     }

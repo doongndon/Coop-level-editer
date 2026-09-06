@@ -24,20 +24,36 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
         if (type != SearchType::MyLevels && type != SearchType::SavedLevels) return true;
 
         auto menu = CCMenu::create();
-        menu->setContentSize({ 110.f, 34.f });
+        menu->setContentSize({ 96.f, 30.f });
         menu->addChild(CCMenuItemExt::createSpriteExtra(
-            ButtonSprite::create("COOP", "bigFont.fnt", "GJ_button_01.png", 0.6f),
+            ButtonSprite::create("COOP", "bigFont.fnt", "GJ_button_01.png", 0.5f),
             [](CCMenuItemSpriteExtra*) {
                 if (auto popup = CoopPopup::create()) popup->show();
             }
         ));
         menu->setLayout(RowLayout::create());
         menu->setZOrder(50);
-
-        // 왼쪽 아래. 이 화면에서 GD가 쓰지 않는 자리다.
-        menu->setPosition({ 60.f, 32.f });
+        menu->setPosition(this->coopSpot());
         this->addChild(menu);
 
         return true;
+    }
+
+    // 이 화면도 사방이 버튼이라 어디가 비었는지는 화면 크기마다 다르다.
+    // 처음에 왼쪽 아래에 뒀더니 GD 자기 버튼 위에 겹쳤다. 고르게 한다.
+    cocos2d::CCPoint coopSpot() {
+        auto size = CCDirector::get()->getWinSize();
+        auto spot = Mod::get()->getSettingValue<std::string>("browser-spot");
+
+        auto left = 62.f;
+        auto right = size.width - 62.f;
+
+        if (spot == "top-left") return { left, size.height - 26.f };
+        if (spot == "top-right") return { right, size.height - 26.f };
+        if (spot == "bottom-left") return { left, 26.f };
+        if (spot == "bottom-right") return { right, 26.f };
+
+        // 기본값. 왼쪽 줄에서 GD 버튼들 사이가 비어 있는 높이다.
+        return { left, size.height * 0.45f };
     }
 };
