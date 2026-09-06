@@ -973,9 +973,23 @@ namespace coop {
     void noticeLocalEdit(GameObject* object) {
         if (g_applyingRemote || !g_active || !object) return;
 
-        auto known = g_uidByLocalId.find(object->m_uniqueID);
-        if (known == g_uidByLocalId.end()) return;
-        g_quiet.erase(known->second);
+        if (auto known = g_uidByLocalId.find(object->m_uniqueID);
+            known != g_uidByLocalId.end()) {
+            g_quiet.erase(known->second);
+        }
+
+        // 시험 플레이 중에 고친 것도 전해져야 한다.
+        //
+        // 플레이 중에는 레벨 전체를 훑는 검사를 쉰다. 게임이 트리거로 물체를
+        // 이리저리 옮기는 중이라, 그걸 "누가 편집했다"로 읽으면 상대 레벨이
+        // 망가지기 때문이다.
+        //
+        // 그런데 사람이 진짜로 고친 것까지 같이 묻혔다. 받기는 계속 받으면서
+        // 보내기만 멈추니 한쪽으로만 어긋난다. 여기 담아두면 훑기를 쉬는
+        // 중에도 이것만은 따로 살펴본다.
+        //
+        // 전체 순찰은 쉬어도, 손들고 신고한 건은 처리하는 것과 같다.
+        g_pending.push_back(object);
     }
 
     void noticeObject(GameObject* object) {
