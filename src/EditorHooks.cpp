@@ -245,11 +245,26 @@ class $modify(CoopEditorUI, EditorUI) {
         auto label = m_fields->m_status;
         if (!label) return;
 
-        // EDIT 탭이 열렸을 때만 보여준다. 기본 자리가 그 탭 안의 빈 곳이라,
-        // 탭이 닫혀 있을 때도 띄우면 아무것도 없는 허공에 떠 있게 된다.
-        // GD가 EDIT 버튼 줄을 켜고 끄는 조건과 똑같은 조건을 쓴다.
+        // 언제 보여줄지.
+        //
+        // 기본 자리가 EDIT 탭 안의 빈 곳이라, 그 탭이 닫혀 있으면 아무것도
+        // 없는 허공에 떠 있게 된다. 그래서 GD의 EDIT 버튼 줄을 그대로 따라간다.
+        // 그 줄이 보이면 우리도 보이고, 숨으면 우리도 숨는다. 시험 삼아
+        // 플레이할 때도, 다른 모드가 화면을 걷어낼 때도 알아서 같이 사라진다.
         if (auto holder = m_fields->m_holder) {
-            holder->setVisible(this->m_selectedMode == 3);
+            auto showing = this->m_selectedMode == 3;
+
+            if (auto bar = this->m_editButtonBar; !bar || !bar->isVisible()) {
+                showing = false;
+            }
+
+            // 위 줄만으로 놓치는 경우가 있어 한 겹 더 본다.
+            // 시험 플레이 중에는 화면이 레벨 그 자체라 무엇이든 방해가 된다.
+            if (auto editor = LevelEditorLayer::get()) {
+                if (editor->m_playbackMode != PlaybackMode::Not) showing = false;
+            }
+
+            holder->setVisible(showing);
         }
 
         switch (coop::state()) {
