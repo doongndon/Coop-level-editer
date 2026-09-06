@@ -255,6 +255,11 @@ namespace coop {
         auto editor = LevelEditorLayer::get();
         auto objects = (editor && editor->m_objects) ? editor->m_objects->count() : 0u;
 
+        auto waiting = pendingCount();
+        if (waiting > 0) {
+            return fmt::format("obj {}  loading {} more...", objects, waiting);
+        }
+
         return fmt::format(
             "obj {}  cur {}/{}  col {}/{}  ok {}",
             objects,

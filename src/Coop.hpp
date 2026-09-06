@@ -146,6 +146,9 @@ namespace coop {
 
     // --- 상대가 잡고 있는 물체 / 보고 있는 화면 ---
 
+    // 방에서 받았지만 아직 만들지 못한 오브젝트 수. 진행 상황 표시용.
+    int pendingCount();
+
     // uid로 오브젝트를 찾는다. 없거나 이미 레벨에서 빠졌으면 nullptr.
     GameObject* objectForUid(std::string const& uid);
     // 서버에서 온 "상대가 잡고 있는 것" 목록을 받아둔다.

@@ -63,12 +63,30 @@ function announcePeers(room) {
     }
 }
 
+// 방의 내용을 나눠 보낸다.
+//
+// 한 덩어리로 보내면 오브젝트가 많은 레벨에서 메시지 하나가 수 MB가 된다.
+// 받는 쪽은 그걸 한 번에 해석하고 한 번에 만들다가 그대로 멈춘다.
+const STATE_CHUNK = 400;
+
 function sendState(room, client) {
-    const objects = [];
-    for (const [uid, data] of room.objects) {
-        objects.push({ uid, data });
+    const all = [...room.objects].map(([uid, data]) => ({ uid, data }));
+
+    // 비어 있어도 한 번은 보낸다. 받는 쪽이 "다 왔다"를 알아야 하기 때문.
+    if (all.length === 0) {
+        sendTo(client, { type: "state", objects: [], left: 0 });
+        return;
     }
-    sendTo(client, { type: "state", objects });
+
+    for (let at = 0; at < all.length; at += STATE_CHUNK) {
+        const part = all.slice(at, at + STATE_CHUNK);
+        sendTo(client, {
+            type: "state",
+            objects: part,
+            // 아직 몇 개가 더 오는지. 받는 쪽이 진행 상황을 보여주는 데 쓴다.
+            left: all.length - at - part.length,
+        });
+    }
 }
 
 // 만들어진 방은 비어 있어도 전부 알려준다. 그래야 방을 만든 사람이
@@ -153,7 +171,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v7 (chat, locks, selection)";
+const SERVER_VERSION = "v8 (chunked sync)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -342,6 +360,20 @@ wss.on("connection", client => {
                 room.objects.set(msg.uid, msg.data);
                 relay(room, client, { type: msg.type, uid: msg.uid, data: msg.data });
                 return;
+
+            // 여러 개를 한 번에. 레벨을 통째로 올릴 때 하나씩 보내면
+            // 오브젝트 수만큼 메시지가 생긴다.
+            case "addMany": {
+                if (!Array.isArray(msg.items)) return;
+                const good = [];
+                for (const item of msg.items) {
+                    if (!item || typeof item.uid !== "string" || typeof item.data !== "string") continue;
+                    room.objects.set(item.uid, item.data);
+                    good.push({ uid: item.uid, data: item.data });
+                }
+                if (good.length) relay(room, client, { type: "addMany", items: good });
+                return;
+            }
 
             case "remove":
                 if (typeof msg.uid !== "string") return;

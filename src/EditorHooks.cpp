@@ -175,6 +175,13 @@ class $modify(CoopEditorUI, EditorUI) {
                     break;
                 }
 
+                // 큰 레벨을 받는 중이면 멈춘 것처럼 보인다. 남은 개수를 띄운다.
+                if (auto waiting = coop::pendingCount(); waiting > 0) {
+                    label->setString(fmt::format("COOP - LOADING {}", waiting).c_str());
+                    label->setColor({ 255, 220, 90 });
+                    break;
+                }
+
                 auto peers = coop::peerCount();
                 label->setString(fmt::format("COOP ON - {} PARTNER(S)", peers).c_str());
                 // 혼자면 노란색, 상대가 있으면 초록색

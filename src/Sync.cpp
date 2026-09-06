@@ -43,6 +43,19 @@ namespace {
     std::string g_lastStats;
     // 마지막으로 알린 내 선택. 바뀌었을 때만 보낸다.
     std::string g_lastSelection;
+
+    // 아직 만들지 않은, 방에서 받은 오브젝트들.
+    //
+    // 3만 개짜리 레벨을 받을 때 한 번에 다 만들면 그 프레임에서 게임이 멈춘다.
+    // 받아만 두고 매 검사마다 조금씩 만든다.
+    std::vector<std::pair<std::string, std::string>> g_incoming;
+    // 서버가 알려준 "아직 더 올 개수". 진행 상황 표시에만 쓴다.
+    int g_stillComing = 0;
+    constexpr std::size_t APPLY_BATCH = 400;
+
+    // 올릴 것을 모아 한 번에 보낸다. 하나씩 보내면 오브젝트 수만큼 메시지가 생긴다.
+    matjson::Value g_outgoing = matjson::Value::array();
+    constexpr std::size_t SEND_BATCH = 200;
     unsigned int g_statsTick = 0;
     constexpr unsigned int STATS_EVERY = 8;   // 0.25초 x 8 = 2초
 
@@ -57,7 +70,11 @@ namespace {
     // 레벨이 클 수 있으니 한 번에 전부 훑지 않고 조금씩 나눠서 본다.
     // 한 프레임에 몰리면 게임이 끊기기 때문.
     unsigned int g_scanIndex = 0;
+    // 평소에는 조금씩만 훑는다. 한 프레임에 몰리면 게임이 끊긴다.
     constexpr unsigned int SCAN_SLICE = 60;
+    // 레벨을 통째로 올리는 중에는 크게 훑는다. 3만 개짜리를 60개씩 올리면
+    // 2분이 넘게 걸린다. 이건 처음 한 번뿐이라 잠깐 무거운 편이 낫다.
+    constexpr unsigned int UPLOAD_SLICE = 500;
 
     // 테스트 플레이 중인지. 그동안은 게임이 오브젝트를 마음대로 옮기고 떼어내서
     // 무엇이 지워졌는지 판단할 수 없다.
@@ -259,17 +276,29 @@ namespace {
         }
     }
 
-    // 아직 모르는 오브젝트다. uid를 붙이고 서버에 알린다.
+    // 모아둔 것을 실제로 내보낸다.
+    void flushOutgoing() {
+        if (g_outgoing.size() == 0) return;
+
+        matjson::Value msg;
+        msg["type"] = "addMany";
+        msg["items"] = std::move(g_outgoing);
+        g_outgoing = matjson::Value::array();
+        coop::send(std::move(msg));
+    }
+
+    // 아직 모르는 오브젝트다. uid를 붙이고 보낼 목록에 담는다.
     void trackAndSend(LevelEditorLayer* editor, GameObject* object) {
         auto uid = makeUid();
         auto data = saveStringOf(object, editor);
         remember(uid, object, data);
 
-        matjson::Value msg;
-        msg["type"] = "add";
-        msg["uid"] = uid;
-        msg["data"] = data;
-        coop::send(std::move(msg));
+        matjson::Value item;
+        item["uid"] = uid;
+        item["data"] = data;
+        g_outgoing.push(std::move(item));
+
+        if (g_outgoing.size() >= SEND_BATCH) flushOutgoing();
     }
 
     // 이미 아는 오브젝트다. 내용이 달라졌으면 알린다.
@@ -297,6 +326,62 @@ namespace {
         } else {
             sendIfChanged(editor, known->second, object);
         }
+    }
+
+    // 방에서 받아둔 것을 조금씩 만든다.
+    //
+    // 여러 개를 ";"로 이어 한 번에 만든다. GD의 저장 형식이 원래 그렇게
+    // 여러 개를 담는 형식이라, 한 개씩 부르는 것보다 훨씬 빠르다.
+    // 만들어진 순서는 넣은 순서와 같아서 uid를 차례로 붙일 수 있다.
+    void applyIncoming(LevelEditorLayer* editor) {
+        if (g_incoming.empty()) return;
+
+        RemoteScope scope;
+
+        auto count = std::min(APPLY_BATCH, g_incoming.size());
+        std::string joined;
+        std::vector<std::size_t> fresh;
+
+        for (std::size_t i = 0; i < count; ++i) {
+            auto const& [uid, data] = g_incoming[i];
+            if (data.empty()) continue;
+
+            // 이미 아는 것은 고쳐야 할 수도 있으니 따로 처리한다.
+            if (g_objectByUid.contains(uid)) {
+                applyState(editor, uid, data);
+                continue;
+            }
+
+            if (!joined.empty()) joined += ';';
+            joined += data;
+            fresh.push_back(i);
+        }
+
+        if (!fresh.empty()) {
+            auto created = editor->createObjectsFromString(joined, true, true);
+            auto made = created ? created->count() : 0u;
+
+            if (made == fresh.size()) {
+                for (std::size_t k = 0; k < fresh.size(); ++k) {
+                    auto object = static_cast<GameObject*>(created->objectAtIndex(k));
+                    if (!object) continue;
+                    g_present.insert(object);
+                    auto const& [uid, data] = g_incoming[fresh[k]];
+                    remember(uid, object, data);
+                }
+            } else {
+                // 개수가 어긋나면 어느 것이 어느 uid인지 알 수 없다.
+                // 그럴 때는 하나씩 다시 만든다. 느리지만 어긋나는 것보다 낫다.
+                log::warn("묶음 생성이 어긋났습니다 ({} 요청, {} 생성). 하나씩 다시 만듭니다",
+                          fresh.size(), made);
+                for (auto index : fresh) {
+                    auto const& [uid, data] = g_incoming[index];
+                    applyState(editor, uid, data);
+                }
+            }
+        }
+
+        g_incoming.erase(g_incoming.begin(), g_incoming.begin() + count);
     }
 
     // 사라진 오브젝트를 찾아 상대에게 알린다.
@@ -352,6 +437,9 @@ namespace coop {
         g_lastSettings.clear();
         g_lastStats.clear();
         g_lastSelection.clear();
+        g_incoming.clear();
+        g_stillComing = 0;
+        g_outgoing = matjson::Value::array();
         forgetAppliedSettings();
 
         matjson::Value msg;
@@ -448,6 +536,14 @@ namespace coop {
 
         ensurePresent(editor);
 
+        // 방에서 받아둔 것을 먼저 조금 만든다. 다 만들기 전에는 내 것을
+        // 올리지 않는다. 아직 안 만든 것을 "새 오브젝트"로 착각해 방에
+        // 도로 올려버리면 오브젝트가 두 배가 된다.
+        if (!g_incoming.empty()) {
+            applyIncoming(editor);
+            return;
+        }
+
         // 훅에서 담아둔 새 오브젝트를 게임 일이 끝난 지금 처리한다.
         if (!g_pending.empty()) {
             auto pending = std::move(g_pending);
@@ -487,13 +583,25 @@ namespace coop {
         }
 
         if (g_scanIndex >= total) g_scanIndex = 0;
-        auto end = std::min(g_scanIndex + SCAN_SLICE, total);
+
+        // 아직 방에 올리지 않은 것이 많이 남았으면 크게 훑는다.
+        auto known = static_cast<unsigned int>(g_uidByLocalId.size());
+        auto slice = (known + SCAN_SLICE < total) ? UPLOAD_SLICE : SCAN_SLICE;
+        auto end = std::min(g_scanIndex + slice, total);
 
         for (unsigned int i = g_scanIndex; i < end; ++i) {
             inspect(editor, static_cast<GameObject*>(objects->objectAtIndex(i)));
         }
 
         g_scanIndex = (end >= total) ? 0 : end;
+
+        // 이번 검사에서 모은 것을 내보낸다.
+        flushOutgoing();
+    }
+
+    // 아직 만들지 못하고 쌓여 있는 개수. 창에 진행 상황으로 띄운다.
+    int pendingCount() {
+        return static_cast<int>(g_incoming.size()) + g_stillComing;
     }
 
     GameObject* objectForUid(std::string const& uid) {
@@ -570,16 +678,23 @@ namespace coop {
             return;
         }
 
-        if (type == "state") {
-            // 방에 들어왔을 때 서버가 지금까지 쌓인 오브젝트를 한 번에 보내준다.
-            auto objects = msg["objects"];
+        if (type == "state" || type == "addMany") {
+            // 여기서 만들지 않고 담아만 둔다.
+            //
+            // 3만 개짜리 레벨이면 이 자리에서 다 만들다가 게임이 그대로 멈춘다.
+            // 매 검사마다 조금씩 만들도록 넘긴다.
+            auto objects = msg[type == "state" ? "objects" : "items"];
             if (!objects.isArray()) return;
 
             for (auto const& entry : objects) {
                 auto uid = entry["uid"].asString().unwrapOr("");
                 auto data = entry["data"].asString().unwrapOr("");
                 if (uid.empty() || data.empty()) continue;
-                applyState(editor, uid, data);
+                g_incoming.emplace_back(std::move(uid), std::move(data));
+            }
+
+            if (type == "state") {
+                g_stillComing = static_cast<int>(msg["left"].asInt().unwrapOr(0));
             }
             return;
         }
