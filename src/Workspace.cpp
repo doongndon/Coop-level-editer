@@ -19,7 +19,27 @@ using namespace geode::prelude;
 // 지운다. 손님의 원래 레벨 목록은 손도 대지 않는다.
 namespace {
     // 이 표시로 시작하는 레벨은 우리가 만든 임시 레벨이다.
-    constexpr char const* WORKSPACE_MARK = "[COOP] ";
+    //
+    // 예전에는 "[COOP] " 였는데 대괄호를 뺐다. 레벨 이름을 그대로 파일 이름이나
+    // 저장 열쇠로 쓰는 모드들이 있는데, 거기에 대괄호 같은 글자가 들어가면
+    // 열쇠를 못 찾고 빈 것을 돌려준다. 그걸 그대로 쓰다 죽는 모드가 있었다.
+    constexpr char const* WORKSPACE_MARK = "COOP ";
+    // 옛 판이 만들어놓고 간 것도 계속 치워줘야 한다.
+    constexpr char const* OLD_WORKSPACE_MARK = "[COOP] ";
+
+    // 방 이름에도 같은 위험이 있다. 글자와 숫자만 남긴다.
+    std::string safeName(std::string const& room) {
+        std::string out;
+        for (auto ch : room) {
+            auto u = static_cast<unsigned char>(ch);
+            if ((u >= '0' && u <= '9') || (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z')
+                || ch == '-' || ch == '_' || ch == ' ') {
+                out.push_back(ch);
+            }
+        }
+        if (out.empty()) out = "room";
+        return out;
+    }
 
     // 지금 쓰고 있는 임시 레벨.
     Ref<GJGameLevel> g_workspace;
@@ -33,7 +53,8 @@ namespace {
     bool g_opening = false;
 
     bool isWorkspaceName(std::string const& name) {
-        return name.rfind(WORKSPACE_MARK, 0) == 0;
+        return name.rfind(WORKSPACE_MARK, 0) == 0
+            || name.rfind(OLD_WORKSPACE_MARK, 0) == 0;
     }
 
     void reallyDelete(GJGameLevel* level) {
@@ -73,7 +94,7 @@ namespace coop {
             return;
         }
 
-        level->m_levelName = WORKSPACE_MARK + room;
+        level->m_levelName = WORKSPACE_MARK + safeName(room);
 
         // 이미 임시 레벨에 있었다면 그건 버린다. 다만 지금 그 레벨의 에디터
         // 안에 있으므로, 화면이 넘어간 뒤에 지운다.
