@@ -518,9 +518,24 @@ namespace {
         std::string joined;
         std::vector<std::size_t> fresh;
 
+        // 이번 묶음 안에서 이미 다룬 uid.
+        //
+        // 같은 uid가 한 묶음에 두 번 들어올 수 있다. 방에 들어가면 서버가 방의
+        // 레벨을 보내주는데, 우리는 에디터가 열리면서 한 번 더 달라고 한다.
+        // 그러면 같은 목록이 두 벌 쌓인다.
+        //
+        // 아래 "이미 아는 것인가" 검사는 만들고 나서야 참이 되므로, 한 묶음
+        // 안에 있는 둘은 둘 다 통과해 각각 만들어진다. 그러고는 하나만 짝을
+        // 짓는다. 짝 없는 물체가 딱 절반씩 쌓여 오브젝트 수가 두 배가 됐다.
+        // 실제로 한쪽 110개에 다른 쪽 220개였다.
+        std::unordered_set<std::string> seen;
+
         for (std::size_t i = 0; i < count; ++i) {
             auto const& [uid, data] = g_incoming[i];
             if (data.empty()) continue;
+
+            // 이번 묶음에서 이미 다룬 uid면 건너뛴다. 같은 물건이다.
+            if (!seen.insert(uid).second) continue;
 
             // 이미 아는 것은 고쳐야 할 수도 있으니 따로 처리한다.
             if (g_objectByUid.contains(uid)) {
