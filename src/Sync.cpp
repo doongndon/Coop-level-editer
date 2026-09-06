@@ -49,6 +49,9 @@ namespace {
     // 3만 개짜리 레벨을 받을 때 한 번에 다 만들면 그 프레임에서 게임이 멈춘다.
     // 받아만 두고 매 검사마다 조금씩 만든다.
     std::vector<std::pair<std::string, std::string>> g_incoming;
+
+    // 이 방의 원본을 내가 들고 있는지. 방장이면 참.
+    bool g_hosting = false;
     // 서버가 알려준 "아직 더 올 개수". 진행 상황 표시에만 쓴다.
     int g_stillComing = 0;
     constexpr std::size_t APPLY_BATCH = 400;
@@ -521,7 +524,9 @@ namespace coop {
         return LevelEditorLayer::get() != nullptr;
     }
 
+    // 이 방에서 내가 원본을 들고 있는 쪽인지.
     void uploadWholeLevel() {
+        g_hosting = true;
         // 대응표가 비어 있으면 다음 검사에서 레벨의 모든 오브젝트가
         // "처음 보는 것"이 되어 차례로 방에 올라간다.
         g_uidByLocalId.clear();
@@ -536,6 +541,9 @@ namespace coop {
     }
 
     void clearLevel() {
+        // 내 레벨을 비우고 방 것을 받는다. 나는 손님이다.
+        g_hosting = false;
+
         auto editor = LevelEditorLayer::get();
         if (!editor || !editor->m_objects) return;
 
@@ -593,6 +601,13 @@ namespace coop {
 
     void syncLevelSettings() {
         if (!inRoom() || g_applyingRemote) return;
+
+        // 손님은 방의 설정을 받기 전까지 자기 것을 올리지 않는다.
+        //
+        // 손님은 텅 빈 임시 레벨에서 시작한다. 그 기본 색깔을 먼저 올려버리면
+        // 방장의 색깔이 손님의 흰 도화지로 덮인다. 실제로 그렇게 되고 있었다.
+        // 새로 온 사람이 남의 집 벽지를 자기 집 기본 벽지로 발라버리는 셈이다.
+        if (!g_hosting && !roomSettingsApplied()) return;
 
         auto text = levelSettingsString();
         if (text.empty() || text == g_lastSettings) return;

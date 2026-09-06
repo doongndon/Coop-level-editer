@@ -141,6 +141,9 @@ namespace coop {
     void syncLevelSettings();
     // 방이나 레벨이 바뀌었다. 다음 설정은 같은 내용이라도 화면에 다시 반영한다.
     void forgetAppliedSettings();
+    // 방의 설정을 한 번이라도 받아 반영했는지. 손님이 자기 빈 레벨의 설정으로
+    // 방장의 색깔을 덮어쓰지 않도록 하는 데 쓴다.
+    bool roomSettingsApplied();
 
     // 서버에서 받은 내용을 적용하는 중인지. 적용 중에는 되돌려 보내지 않는다.
     bool isApplyingRemote();

@@ -173,6 +173,13 @@ namespace {
     // 마지막으로 화면에 반영한 설정(색 제외). 같은 내용이면 다시 그리지 않는다.
     std::string g_appliedRest;
 
+    // 방의 설정을 한 번이라도 받아서 반영했는지.
+    //
+    // 손님은 텅 빈 임시 레벨에서 시작한다. 그 상태로 자기 설정을 방에 올리면
+    // 방장의 색깔과 배경이 손님의 기본값으로 덮인다. 실제로 그렇게 되고 있었다.
+    // 그래서 손님은 방에서 받기 전까지 아무것도 올리지 않는다.
+    bool g_haveRoomSettings = false;
+
     // --- 곡 내려받기 ---
     //
     // 방장이 쓰는 곡을 내가 안 갖고 있으면 번호만 맞고 소리는 나지 않는다.
@@ -286,8 +293,13 @@ namespace coop {
         );
     }
 
+    bool roomSettingsApplied() {
+        return g_haveRoomSettings;
+    }
+
     void forgetAppliedSettings() {
         g_appliedRest.clear();
+        g_haveRoomSettings = false;
         // 방이 바뀌면 옛 방의 설정을 들고 있을 이유가 없다.
         g_held = {};
         g_wantedSongs.clear();
@@ -418,6 +430,9 @@ namespace coop {
         settings->m_songOffset = floatOf(values, "kA13", settings->m_songOffset);
         settings->m_fadeIn     = boolOf(values, "kA15", settings->m_fadeIn);
         settings->m_fadeOut    = boolOf(values, "kA16", settings->m_fadeOut);
+
+        // 여기까지 왔으면 방의 설정을 실제로 반영한 것이다.
+        g_haveRoomSettings = true;
 
         auto incomingColors = stringOf(values, COLOR_KEY);
         g_colorCharsIn = static_cast<int>(incomingColors.size());
