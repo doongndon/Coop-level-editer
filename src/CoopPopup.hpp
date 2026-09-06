@@ -37,8 +37,11 @@ protected:
     // 방을 만들거나 들어가기 직전에 열쇠를 정해준다.
     void useTypedPassword();
 
+    CCMenuItemSpriteExtra* m_soloButton = nullptr;
+
     void onCreate(CCMenuItemSpriteExtra*);
     void onLeave(CCMenuItemSpriteExtra*);
+    void onSolo(CCMenuItemSpriteExtra*);
     void onUpdate(CCMenuItemSpriteExtra*);
     void onChat(CCMenuItemSpriteExtra*);
     void onFollow(CCMenuItemSpriteExtra*);
@@ -47,6 +50,26 @@ protected:
 
 public:
     static CoopPopup* create();
+};
+
+// 방에서 레벨을 받는 동안 띄우는 창.
+//
+// 오브젝트가 많은 레벨은 다 받는 데 시간이 걸린다. 그동안 아무것도
+// 안 보여주면 멈춘 것처럼 보이고, 편집을 시작해버리면 받는 중인 것과
+// 뒤섞인다. 다 받을 때까지 막아두는 편이 낫다.
+class CoopLoadingPopup : public geode::Popup {
+protected:
+    cocos2d::CCLabelBMFont* m_countLabel = nullptr;
+    cocos2d::CCLayerColor* m_barFill = nullptr;
+    int m_mostSeen = 0;
+
+    bool init();
+    void tick(float);
+
+public:
+    static CoopLoadingPopup* create();
+    // 지금 받는 중이면 띄우고, 다 받았으면 닫는다.
+    static void refresh();
 };
 
 // 방 안에서 짧게 주고받는 말.

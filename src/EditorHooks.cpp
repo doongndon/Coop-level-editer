@@ -262,6 +262,7 @@ class $modify(CoopEditorUI, EditorUI) {
         coop::tickSongDownload();
         coop::fadeOldCursors();
         coop::drawPeerSelection();
+        CoopLoadingPopup::refresh();
         coop::sendView();
         this->updateCoopStatus();
     }

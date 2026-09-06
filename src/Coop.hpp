@@ -47,6 +47,15 @@ namespace coop {
     // 방 이름 칸에 미리 채워줄 이름. 계정 이름을 따서 만든다.
     std::string suggestedRoomName();
 
+    // 혼자 시험하기.
+    //
+    // 켜면 서버가 내가 보낸 커서, 선택, 화면, 상태를 "Echo"라는 가짜 상대가
+    // 보낸 것처럼 돌려준다. 기기 두 대를 붙이지 않고도 그것들이 제대로
+    // 그려지는지 확인할 수 있다. 오브젝트는 돌려주지 않는다. 돌려주면
+    // 물건이 두 배가 된다.
+    void setSoloTest(bool on);
+    bool soloTest();
+
     // 방을 만들거나 들어갈 때 쓸 열쇠. 비워두면 잠그지 않는다.
     // 만들기/들어가기를 부르기 직전에 정해준다.
     void setRoomPassword(std::string password);

@@ -46,6 +46,16 @@ function fail(client, reason) {
     sendTo(client, { type: "error", reason });
 }
 
+// 혼자 시험할 때, 방금 보낸 것을 "Echo"라는 가짜 상대가 보낸 것처럼 돌려준다.
+//
+// 기기 두 대를 붙이지 않고도 커서가 그려지는지, 채팅이 오가는지,
+// 상대가 잡은 물체에 테두리가 생기는지 확인할 수 있다.
+// 오브젝트는 여기에 넣지 않는다. 돌려주면 물건이 두 배가 된다.
+function echoBack(client, payload) {
+    if (!client.solo) return;
+    sendTo(client, { ...payload, from: "echo", name: "Echo" });
+}
+
 // 보낸 사람을 뺀 나머지에게 전달한다.
 // 보낸 사람에게 되돌려주면 오브젝트가 두 번 생기므로 반드시 제외한다.
 function relay(room, sender, payload) {
@@ -59,7 +69,8 @@ function relay(room, sender, payload) {
 
 function announcePeers(room) {
     for (const peer of room.clients) {
-        sendTo(peer, { type: "peers", count: room.clients.size - 1 });
+        // 혼자 시험 중이면 가짜 상대 한 명을 더 있는 것으로 센다.
+        sendTo(peer, { type: "peers", count: room.clients.size - 1 + (peer.solo ? 1 : 0) });
     }
 }
 
@@ -171,7 +182,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v8 (chunked sync)";
+const SERVER_VERSION = "v9 (solo test)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -185,6 +196,9 @@ wss.on("connection", client => {
     client.roomName = null;
     client.clientId = String(nextClientId++);
     client.playerName = "Player";
+    // 혼자 시험하기. 켜면 커서, 선택, 화면, 상태를 본인에게도 되돌려준다.
+    // 오브젝트는 절대 되돌려주지 않는다. 그러면 물건이 두 배가 된다.
+    client.solo = false;
 
     // 서버가 몇 번째 판인지 먼저 알려준다. 모드가 창에 띄워주면
     // 배포가 실제로 갱신됐는지 브라우저를 열지 않고도 알 수 있다.
@@ -203,6 +217,13 @@ wss.on("connection", client => {
             if (typeof msg.name === "string" && msg.name !== "") {
                 client.playerName = msg.name.slice(0, 32);
             }
+            return;
+        }
+
+        if (msg.type === "solo") {
+            client.solo = !!msg.on;
+            const room = rooms.get(client.roomName);
+            if (room) announcePeers(room);
             return;
         }
 
@@ -303,6 +324,7 @@ wss.on("connection", client => {
             case "sel":
             case "view":
                 relay(room, client, { ...msg, from: client.clientId, name: client.playerName });
+                echoBack(client, msg);
                 return;
 
             // 채팅. 나중에 들어온 사람에게도 최근 몇 줄은 보여준다.
@@ -326,6 +348,7 @@ wss.on("connection", client => {
                     name: client.playerName,
                     text: msg.text.slice(0, 120),
                 });
+                echoBack(client, { type: "stats", text: msg.text.slice(0, 120) });
                 return;
 
             // 커서는 계속 바뀌는 값이라 보관하지 않고 그대로 흘려보낸다.
@@ -338,6 +361,9 @@ wss.on("connection", client => {
                     x: msg.x,
                     y: msg.y,
                 });
+                // 혼자 시험할 때는 조금 떨어진 자리에 찍어준다. 같은 자리면
+                // 내 손가락에 가려 보이지 않는다.
+                echoBack(client, { type: "cursor", x: msg.x + 60, y: msg.y + 40 });
                 return;
 
             // 레벨 설정은 하나뿐이라 덮어쓰고 그대로 전달한다.

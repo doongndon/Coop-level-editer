@@ -37,6 +37,9 @@ namespace {
     // 상대가 알려준 자기 상태. 두 기기를 오가지 않고 한 화면에서 보려는 것.
     std::string g_peerStats;
 
+    // 혼자 시험하기. 서버가 내가 보낸 것을 가짜 상대 이름으로 돌려준다.
+    bool g_solo = false;
+
     // 아직 접속 전에 "방 만들기"를 누른 경우. 연결되면 들어가기 대신 만들기를 보낸다.
     std::atomic<bool> g_createOnConnect = false;
 
@@ -108,6 +111,12 @@ namespace {
                 g_state = coop::State::Connected;
                 setLastError("");
                 sendHello();
+                if (g_solo) {
+                    matjson::Value solo;
+                    solo["type"] = "solo";
+                    solo["on"] = true;
+                    sendRaw(solo);
+                }
                 // 연결이 (재)성사되면 마지막에 있던 방으로 돌아가 본다.
                 // 그 방이 이미 사라졌으면 서버가 거절하고, 우리는 방 밖에 남는다.
                 Loader::get()->queueInMainThread([]() {
@@ -376,6 +385,19 @@ namespace coop {
 
     // 방 만들기와 들어가기는 접속을 다시 하지 않는다. 예전에는 방을 바꿀 때마다
     // 소켓을 끊고 새로 이었는데, 그 사이에 오간 메시지가 사라져서 꼬였다.
+    void setSoloTest(bool on) {
+        g_solo = on;
+
+        matjson::Value msg;
+        msg["type"] = "solo";
+        msg["on"] = on;
+        send(std::move(msg));
+    }
+
+    bool soloTest() {
+        return g_solo;
+    }
+
     void setRoomPassword(std::string password) {
         g_roomPassword = std::move(password);
     }

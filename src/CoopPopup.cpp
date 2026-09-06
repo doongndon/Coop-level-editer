@@ -3,6 +3,8 @@
 
 #include <Geode/ui/Notification.hpp>
 
+#include <algorithm>
+
 using namespace geode::prelude;
 
 namespace {
@@ -101,20 +103,27 @@ bool CoopPopup::init() {
 
     // --- 채팅 / 화면 따라가기 ---
     auto tools = CCMenu::create();
-    tools->setContentSize({ 320.f, 30.f });
+    tools->setContentSize({ 360.f, 30.f });
 
     tools->addChild(CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("Chat", "bigFont.fnt", "GJ_button_04.png", 0.5f),
+        ButtonSprite::create("Chat", "bigFont.fnt", "GJ_button_04.png", 0.42f),
         [this](CCMenuItemSpriteExtra*) { this->onChat(nullptr); }
     ));
 
     m_followButton = CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("Go To Partner", "bigFont.fnt", "GJ_button_02.png", 0.5f),
+        ButtonSprite::create("Go To", "bigFont.fnt", "GJ_button_02.png", 0.42f),
         [this](CCMenuItemSpriteExtra*) { this->onFollow(nullptr); }
     );
     tools->addChild(m_followButton);
 
-    tools->setLayout(RowLayout::create()->setGap(14.f));
+    // 기기 두 대 없이 커서, 채팅, 선택 표시를 확인해보는 용도.
+    m_soloButton = CCMenuItemExt::createSpriteExtra(
+        ButtonSprite::create("Solo Test", "bigFont.fnt", "GJ_button_05.png", 0.42f),
+        [this](CCMenuItemSpriteExtra*) { this->onSolo(nullptr); }
+    );
+    tools->addChild(m_soloButton);
+
+    tools->setLayout(RowLayout::create()->setGap(10.f));
     m_mainLayer->addChildAtPosition(tools, Anchor::Bottom, ccp(0.f, 48.f));
 
     // --- 접속 상태 ---
@@ -223,6 +232,11 @@ void CoopPopup::tick(float) {
         m_followButton->setEnabled(coop::hasPeerView());
     }
 
+    if (m_soloButton) {
+        // 켜져 있는지 색으로 보여준다.
+        m_soloButton->setColor(coop::soloTest() ? ccColor3B{ 120, 255, 120 } : ccColor3B{ 255, 255, 255 });
+    }
+
     // 방에 있을 때만 나가기를 누를 수 있다.
     if (m_leaveButton) {
         m_leaveButton->setEnabled(coop::inRoom());
@@ -294,6 +308,18 @@ void CoopPopup::onChat(CCMenuItemSpriteExtra*) {
     }
 }
 
+// 혼자 시험하기를 켜고 끈다.
+void CoopPopup::onSolo(CCMenuItemSpriteExtra*) {
+    auto on = !coop::soloTest();
+    coop::setSoloTest(on);
+
+    Notification::create(
+        on ? "Solo test ON - your own cursor and chat come back as \"Echo\""
+           : "Solo test OFF",
+        NotificationIcon::Info, 5.f
+    )->show();
+}
+
 void CoopPopup::onFollow(CCMenuItemSpriteExtra*) {
     if (!coop::hasPeerView()) {
         Notification::create("No partner view yet", NotificationIcon::Info)->show();
@@ -330,6 +356,86 @@ void CoopPopup::askJoin(std::string const& name, bool locked) {
 
 CoopPopup* CoopPopup::create() {
     auto ret = new CoopPopup();
+    if (ret->init()) {
+        ret->autorelease();
+        return ret;
+    }
+    delete ret;
+    return nullptr;
+}
+
+// --- 받는 중 창 ---
+
+bool CoopLoadingPopup::init() {
+    if (!Popup::init(300.f, 140.f)) return false;
+
+    this->setTitle("LOADING LEVEL");
+    // 받는 도중에 편집하면 받는 것과 뒤섞인다. 닫지 못하게 한다.
+    if (m_closeBtn) m_closeBtn->setVisible(false);
+
+    m_countLabel = CCLabelBMFont::create("...", "chatFont.fnt");
+    m_countLabel->setScale(0.5f);
+    m_mainLayer->addChildAtPosition(m_countLabel, Anchor::Center, ccp(0.f, 14.f));
+
+    // 막대 두 장. 바탕은 어둡게, 그 위에 밝은 것을 늘려 채운다.
+    auto track = CCLayerColor::create({ 0, 0, 0, 120 }, 220.f, 12.f);
+    track->ignoreAnchorPointForPosition(false);
+    track->setAnchorPoint({ 0.f, 0.5f });
+    m_mainLayer->addChildAtPosition(track, Anchor::Center, ccp(-110.f, -10.f));
+
+    m_barFill = CCLayerColor::create({ 90, 220, 120, 220 }, 1.f, 12.f);
+    m_barFill->ignoreAnchorPointForPosition(false);
+    m_barFill->setAnchorPoint({ 0.f, 0.5f });
+    m_mainLayer->addChildAtPosition(m_barFill, Anchor::Center, ccp(-110.f, -10.f));
+
+    auto note = CCLabelBMFont::create("Big levels take a while", "chatFont.fnt");
+    note->setScale(0.35f);
+    note->setOpacity(130);
+    m_mainLayer->addChildAtPosition(note, Anchor::Bottom, ccp(0.f, 18.f));
+
+    this->tick(0.f);
+    this->schedule(schedule_selector(CoopLoadingPopup::tick), 0.1f);
+    return true;
+}
+
+void CoopLoadingPopup::tick(float) {
+    auto left = coop::pendingCount();
+    if (left <= 0) {
+        this->onClose(nullptr);
+        return;
+    }
+
+    // 전체 개수를 미리 알 수 없어서, 지금까지 본 가장 큰 값을 전체로 삼는다.
+    if (left > m_mostSeen) m_mostSeen = left;
+
+    if (m_countLabel) {
+        m_countLabel->setString(fmt::format("{} objects left", left).c_str());
+    }
+    if (m_barFill && m_mostSeen > 0) {
+        auto done = static_cast<float>(m_mostSeen - left) / static_cast<float>(m_mostSeen);
+        m_barFill->setContentSize({ std::max(1.f, 220.f * done), 12.f });
+    }
+}
+
+// 받는 중이면 띄우고, 아니면 아무것도 하지 않는다.
+// 에디터 검사에서 계속 부르므로 이미 떠 있는지 확인해야 한다.
+void CoopLoadingPopup::refresh() {
+    static geode::Ref<CoopLoadingPopup> showing = nullptr;
+
+    if (coop::pendingCount() <= 0) {
+        showing = nullptr;
+        return;
+    }
+    if (showing && showing->getParent()) return;
+
+    if (auto popup = CoopLoadingPopup::create()) {
+        popup->show();
+        showing = popup;
+    }
+}
+
+CoopLoadingPopup* CoopLoadingPopup::create() {
+    auto ret = new CoopLoadingPopup();
     if (ret->init()) {
         ret->autorelease();
         return ret;
