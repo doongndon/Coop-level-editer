@@ -117,6 +117,10 @@ namespace coop {
     void openWorkspace(std::string const& room);
     void dropWorkspace();
     void sweepOldWorkspaces();
+    // 에디터 안에서 방에 들어가면, 에디터 위에 에디터를 얹지 않으려고 먼저
+    // 레벨 목록으로 나간다. 목록이 올라온 뒤에 이 둘로 마저 연다.
+    bool hasPendingWorkspace();
+    void openPendingWorkspace();
     bool inWorkspace();
     // 방금 열린 에디터가 우리가 방 때문에 연 것인지. 한 번만 참을 돌려준다.
     bool consumeWorkspaceEntry();

@@ -50,6 +50,42 @@ namespace {
     // 게임이 첫 화면까지 떴는지. 여기 오기 전에는 화면을 건드리면 안 된다.
     bool g_gameReady = false;
 
+    // 레벨 목록으로 나간 뒤에 열어야 할 임시 레벨.
+    //
+    // 에디터가 열려 있는데 그 위에 또 에디터를 얹으면 안 된다. 에디터 모드들은
+    // 에디터가 한 번에 하나뿐이라고 보고 만들어져 있어서, 두 번째가 올라오는
+    // 순간 없는 자리를 짚고 죽는다. 실제로 두 번 그렇게 죽었다.
+    //
+    // 그래서 먼저 레벨 목록으로 나갔다가 거기서 연다. GD가 원래 에디터를 여는
+    // 길이 그것이고, 다른 모드들이 기대하는 길도 그것이다.
+    Ref<GJGameLevel> g_pendingOpen;
+
+    // 실제로 에디터 화면을 만들어 넘어간다.
+    void goToEditor(GJGameLevel* level, bool fade) {
+        if (!level) return;
+
+        // LevelEditorLayer::scene은 윈도우에서 쓸 수 없어서 씬을 직접 만든다.
+        // 다만 GD가 하는 세 가지를 하나도 빠뜨리면 안 된다.
+        //
+        // 처음에는 "빈 씬에 에디터를 얹는 것뿐"이라고 보고 가운데 한 줄만
+        // 옮겼는데, 그게 크래시의 원인이었다. 다른 에디터 모드들은 씬에
+        // 찍힌 표시(objType)를 보고 "여기가 에디터구나" 하고 자기 준비를
+        // 한다. 표시가 없으면 준비를 건너뛰고, 그래놓고 화면이 돌기
+        // 시작하면 준비되지 않은 자리를 짚어서 게임이 죽는다.
+        // 문패 없는 가게에 배달이 안 오는 것과 같다.
+        auto scene = CCScene::create();
+        if (auto app = AppDelegate::get()) app->m_runningScene = scene;
+        scene->addChild(LevelEditorLayer::create(level, false));
+        scene->setObjType(CCObjectType::LevelEditorLayer);
+
+        auto director = CCDirector::sharedDirector();
+        if (fade) {
+            director->replaceScene(CCTransitionFade::create(0.5f, scene));
+        } else {
+            director->replaceScene(scene);
+        }
+    }
+
     // 우리가 방 때문에 에디터를 여는 중이라는 표시.
     // 이게 없으면 새로 열린 에디터가 "에디터에 들어왔으니 방에서 나간다"는
     // 평소 규칙을 그대로 적용해서, 방금 들어간 방에서 곧바로 튕겨 나온다.
@@ -99,6 +135,18 @@ namespace coop {
             return;
         }
 
+        // 이미 이 방의 임시 레벨에서 작업 중이면 아무것도 하지 않는다.
+        //
+        // 연결이 끊겼다 붙으면 서버가 다시 "너 손님이야"라고 알려준다. 그때마다
+        // 새 에디터를 열면 열려 있는 에디터 위에 또 얹게 된다. 이미 그 방에
+        // 있는데 다시 들어갈 이유도 없다.
+        if (inWorkspace()) {
+            if (auto here = g_workspace.data();
+                here && std::string(here->m_levelName) == WORKSPACE_MARK + safeName(room)) {
+                return;
+            }
+        }
+
         auto manager = GameLevelManager::sharedState();
         if (!manager) return;
 
@@ -122,37 +170,30 @@ namespace coop {
         // 다른 모드들이 화면을 훑고 있는 한복판에서 발밑이 바뀐다. 한 박자
         // 미루면 게임이 하던 일을 끝낸 뒤에 넘어간다.
         Loader::get()->queueInMainThread([level = Ref<GJGameLevel>(level)]() {
-            // 이미 에디터 안에서 부른 것인지. 새 에디터를 만들기 전에 봐야 한다.
-            // 만들고 나면 게임이 들고 있는 "지금 에디터"가 새것으로 바뀐다.
-            auto fromEditor = LevelEditorLayer::get() != nullptr;
-
-            // LevelEditorLayer::scene은 윈도우에서 쓸 수 없어서 씬을 직접 만든다.
-            // 다만 GD가 하는 세 가지를 하나도 빠뜨리면 안 된다.
-            //
-            // 처음에는 "빈 씬에 에디터를 얹는 것뿐"이라고 보고 가운데 한 줄만
-            // 옮겼는데, 그게 크래시의 원인이었다. 다른 에디터 모드들은 씬에
-            // 찍힌 표시(objType)를 보고 "여기가 에디터구나" 하고 자기 준비를
-            // 한다. 표시가 없으면 준비를 건너뛰고, 그래놓고 화면이 돌기
-            // 시작하면 준비되지 않은 자리를 짚어서 게임이 죽는다.
-            // 문패 없는 가게에 배달이 안 오는 것과 같다.
-            auto scene = CCScene::create();
-            if (auto app = AppDelegate::get()) app->m_runningScene = scene;
-            scene->addChild(LevelEditorLayer::create(level.data(), false));
-            scene->setObjType(CCObjectType::LevelEditorLayer);
-
-            auto director = CCDirector::sharedDirector();
-            if (fromEditor) {
-                // 방을 옮기는 경우다. 어둡게 넘기면 그 0.5초 동안 옛 에디터와
-                // 새 에디터가 같이 살아서 둘 다 돌아간다. 다른 모드들은 에디터가
-                // 하나뿐이라고 보고 만들어져 있어서 이때 자주 엉킨다.
-                // 여기서는 연출 없이 바로 바꿔 옛 에디터를 즉시 끝낸다.
-                director->replaceScene(scene);
-            } else {
-                // GD도 에디터에 들어갈 때 어둡게 넘긴다. 그냥 바꿔치우면 다른
-                // 모드가 미처 준비되지 않은 화면을 훑게 될 수 있다.
-                director->replaceScene(CCTransitionFade::create(0.5f, scene));
+            if (!LevelEditorLayer::get()) {
+                // 에디터 밖에서 부른 것이다. 바로 연다.
+                goToEditor(level.data(), true);
+                return;
             }
+
+            // 에디터 안이다. 그 위에 또 에디터를 얹으면 죽는다.
+            // 레벨 목록으로 먼저 나가고, 목록이 실제로 올라온 뒤에 연다.
+            g_pendingOpen = level;
+            CCDirector::sharedDirector()->replaceScene(
+                LevelBrowserLayer::scene(GJSearchObject::create(SearchType::MyLevels))
+            );
         });
+    }
+
+    bool hasPendingWorkspace() {
+        return g_pendingOpen.data() != nullptr;
+    }
+
+    // 레벨 목록이 실제로 올라온 뒤에 불린다. 이제 에디터를 열어도 안전하다.
+    void openPendingWorkspace() {
+        auto level = g_pendingOpen;
+        g_pendingOpen = nullptr;
+        if (level) goToEditor(level.data(), true);
     }
 
     void dropWorkspace() {
@@ -182,6 +223,10 @@ namespace coop {
         std::vector<Ref<GJGameLevel>> doomed;
         for (unsigned int i = 0; i < local->m_localLevels->count(); ++i) {
             auto level = static_cast<GJGameLevel*>(local->m_localLevels->objectAtIndex(i));
+            // 곧 열 레벨은 건드리면 안 된다. 레벨 목록을 거쳐 가는 동안
+            // 이 훑기가 돌기 때문에, 안 빼두면 열기도 전에 지워버린다.
+            if (level == g_pendingOpen.data()) continue;
+
             if (level && level != inUse && isWorkspaceName(std::string(level->m_levelName))) {
                 doomed.push_back(level);
             }

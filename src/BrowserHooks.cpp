@@ -24,6 +24,13 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
         // 여기라서, 여기서도 한 번 훑어야 "남았다"는 말이 안 나온다.
         coop::sweepOldWorkspaces();
 
+        // 에디터에서 방에 들어가느라 여기를 거쳐 가는 중이면, 목록이 화면에
+        // 올라온 다음에 에디터를 연다. 여기서 바로 열면 아직 옛 에디터가
+        // 살아 있어서 애초에 피하려던 상황이 그대로 된다.
+        if (coop::hasPendingWorkspace()) {
+            this->scheduleOnce(schedule_selector(CoopLevelBrowser::coopOpenPending), 0.05f);
+        }
+
         // 온라인 검색 결과 같은 곳에는 띄우지 않는다. 내 레벨 목록에서만
         // 의미가 있고, 다른 화면에서는 자리만 차지한다.
         if (!object) return true;
@@ -44,6 +51,10 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
         this->addChild(menu);
 
         return true;
+    }
+
+    void coopOpenPending(float) {
+        coop::openPendingWorkspace();
     }
 
     // 이 화면도 사방이 버튼이라 어디가 비었는지는 화면 크기마다 다르다.
