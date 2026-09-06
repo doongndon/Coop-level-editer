@@ -374,6 +374,8 @@ class $modify(CoopEditorUI, EditorUI) {
         // 그다음 레벨 전체를 조금씩 나눠 훑는다. 되돌리기처럼 어떤 경로로 바뀌었든
         // 결과적으로 달라진 것이 있으면 여기서 잡힌다.
         coop::reconcile();
+        // 방에 들어가느라 에디터가 열리기 전에 온 설정이 있으면 지금 반영한다.
+        coop::flushPendingSettings();
         coop::tickSongDownload();
         coop::fadeOldCursors();
         coop::drawPeerSelection();

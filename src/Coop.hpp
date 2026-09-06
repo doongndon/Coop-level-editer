@@ -133,6 +133,8 @@ namespace coop {
     void applyLevelSettings(
         std::string const& data, int songID, int audioTrack, std::string const& songList
     );
+    // 에디터가 아직 없을 때 받아둔 설정을 반영한다. 주기적으로 부른다.
+    void flushPendingSettings();
     // 없는 곡을 한 곡씩 받아온다. 주기적으로 부른다.
     void tickSongDownload();
     // 설정이 달라졌으면 방에 알린다. 주기적으로 부른다.

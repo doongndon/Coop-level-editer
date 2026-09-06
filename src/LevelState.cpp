@@ -196,6 +196,24 @@ namespace {
     }
 
     // "123,456,789" 처럼 붙어 있는 곡 번호를 하나씩 꺼낸다.
+    // 아직 에디터가 없을 때 받아둔 설정.
+    //
+    // 손님으로 방에 들어가면 서버가 곧바로 방의 설정과 레벨을 보내준다.
+    // 그런데 그때 우리는 임시 레벨의 에디터를 "열라고 시켜둔" 상태일 뿐,
+    // 화면은 다음 차례에나 바뀐다. 그 사이에 온 설정은 반영할 곳이 없다.
+    //
+    // 오브젝트는 줄 세워뒀다가 나중에 만들기 때문에 무사했는데, 설정만
+    // 그 자리에서 버려지고 있었다. 배경도 색깔도 안 맞던 이유가 이것이다.
+    // 짐은 다 들여놨는데 벽지 상자만 문 앞에 두고 온 셈이다.
+    struct HeldSettings {
+        bool waiting = false;
+        std::string data;
+        int songID = 0;
+        int audioTrack = 0;
+        std::string songList;
+    };
+    HeldSettings g_held;
+
     void queueSongList(std::string const& text) {
         size_t start = 0;
         while (start < text.size()) {
@@ -270,6 +288,8 @@ namespace coop {
 
     void forgetAppliedSettings() {
         g_appliedRest.clear();
+        // 방이 바뀌면 옛 방의 설정을 들고 있을 이유가 없다.
+        g_held = {};
         g_wantedSongs.clear();
         g_songAttempts = 0;
         g_songWait = 0;
@@ -338,11 +358,25 @@ namespace coop {
         }
     }
 
+    // 에디터가 생겼으면 들고 있던 설정을 반영한다. 주기적으로 부른다.
+    void flushPendingSettings() {
+        if (!g_held.waiting) return;
+        if (!LevelEditorLayer::get()) return;
+
+        auto held = g_held;
+        g_held = {};
+        applyLevelSettings(held.data, held.songID, held.audioTrack, held.songList);
+    }
+
     void applyLevelSettings(
         std::string const& data, int songID, int audioTrack, std::string const& songList
     ) {
         auto editor = LevelEditorLayer::get();
-        if (!editor) return;
+        if (!editor) {
+            // 아직 에디터가 없다. 버리지 말고 들고 있다가 생기면 반영한다.
+            g_held = { true, data, songID, audioTrack, songList };
+            return;
+        }
 
         auto settings = editor->m_levelSettings;
         if (!settings || data.empty()) return;
