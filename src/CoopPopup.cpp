@@ -71,7 +71,7 @@ bool CoopPopup::init() {
     );
     actions->addChild(m_leaveButton);
 
-    actions->setLayout(RowLayout::create()->setGap(16.f));
+    actions->setLayout(RowLayout::create()->setGap(16.f)->ignoreInvisibleChildren(true));
     m_mainLayer->addChildAtPosition(actions, Anchor::Top, ccp(0.f, -118.f));
 
     // --- 방 목록 ---
@@ -258,14 +258,20 @@ void CoopPopup::tick(float) {
         m_leaveButton->setEnabled(coop::inRoom());
     }
 
-    // 방을 만들려면 올릴 레벨이 열려 있어야 한다. 레벨 목록에서 연 창에서는
-    // 올릴 것이 없으니 들어가기만 된다.
+    // 방을 만들려면 올릴 레벨이 열려 있어야 한다.
+    // "방 만들기"는 곧 "내 레벨을 이 방에 올린다"는 뜻인데, 레벨 목록에서는
+    // 어떤 레벨인지 정해지지 않아서 만들 수가 없다.
     //
-    // 그렇다고 버튼을 꺼두지는 않는다. 꺼진 버튼은 "고장 났다"로 읽힌다.
-    // 눌리게 두고, 왜 안 되는지와 어떻게 하면 되는지를 알려준다.
-    // 잠긴 문에 "왜 잠겼는지"와 "열쇠는 어디 있는지"를 붙여두는 것과 같다.
+    // 그럴 때는 버튼을 꺼두지 않고 아예 치운다. 꺼진 버튼은 "고장 났다"로
+    // 읽히고, 설명을 붙여도 눌러보기 전에는 안 보인다. 그러면 그 창은
+    // "들어가는 창"이 되고, 할 수 있는 것만 놓인다.
     if (m_createButton) {
-        m_createButton->setEnabled(true);
+        auto host = coop::canHost();
+        if (m_createButton->isVisible() != host) {
+            m_createButton->setVisible(host);
+            // 안 보이는 버튼이 자리를 차지하지 않도록 줄을 다시 잡는다.
+            if (auto row = m_createButton->getParent()) row->updateLayout();
+        }
     }
 
     if (m_statusLabel) {
@@ -275,7 +281,9 @@ void CoopPopup::tick(float) {
                 m_statusLabel->setString(
                     coop::inRoom()
                         ? fmt::format("{} partner(s) here", peers).c_str()
-                        : "Connected - pick a room below"
+                        : (coop::canHost()
+                            ? "Connected - pick a room below"
+                            : "Pick a room to join. To host: level > EDIT > COOP")
                 );
                 m_statusLabel->setColor(peers > 0 ? ccColor3B{ 90, 255, 90 } : ccColor3B{ 200, 200, 200 });
                 break;
