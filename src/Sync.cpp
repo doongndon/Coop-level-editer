@@ -168,6 +168,22 @@ namespace {
         portal->m_orangePortal = nullptr;
     }
 
+    // 지우기 직전에 해둘 일.
+    //
+    // 게임 여기저기가 오브젝트를 생 포인터로 붙들고 있다. 우리가 지우면 그
+    // 손들이 전부 사라진 자리를 가리키게 된다. 지우기 전에 하나씩 놓게 한다.
+    void letGoOf(LevelEditorLayer* editor, GameObject* object) {
+        if (!object) return;
+
+        // 내가 잡고 있는 것을 상대가 지울 수 있다. EditorUI도 선택한 것을
+        // 생 포인터로 들고 있어서, 그대로 지우면 다음에 만질 때 죽는다.
+        if (editor && editor->m_editorUI) {
+            editor->m_editorUI->deselectObject(object);
+        }
+
+        unlinkPortal(object);
+    }
+
     // 방에서 받은 것을 다 만든 뒤 한 번 훑는다.
     //
     // 큰 레벨은 나눠서 만들기 때문에 짝이 다른 묶음에 들어갈 수 있다. 만드는
@@ -299,7 +315,7 @@ namespace {
 
             forget(uid);
             if (isInLevel(object)) {
-                unlinkPortal(object);
+                letGoOf(editor, object);
                 editor->removeObject(object, true);
             }
         }
@@ -320,7 +336,7 @@ namespace {
         Ref<GameObject> object = it->second;
         forget(uid);
         if (isInLevel(object)) {
-            unlinkPortal(object);
+            letGoOf(editor, object);
             editor->removeObject(object, true);
         }
     }
@@ -539,7 +555,7 @@ namespace coop {
         // 포탈끼리 서로를 가리키고 있다. 하나씩 지우다 보면 남은 쪽이 이미
         // 사라진 자리를 가리키게 되므로, 지우기 전에 전부 손을 놓게 한다.
         for (auto& held : all) {
-            unlinkPortal(held.data());
+            letGoOf(editor, held.data());
         }
 
         for (auto& held : all) {
@@ -727,14 +743,17 @@ namespace coop {
     }
 
     void handleMessage(matjson::Value const& msg) {
-        auto editor = LevelEditorLayer::get();
-        if (!editor) return;
-
-        // 레벨을 건드리기 전에 우리 목록이 레벨과 맞는지 확인한다.
-        ensurePresent(editor);
-
         auto type = msg["type"].asString().unwrapOr("");
         RemoteScope scope;
+
+        // 여기서 에디터가 있는지 먼저 묻고 없으면 돌아가면 안 된다.
+        //
+        // 방에 들어간 직후가 바로 에디터가 아직 없는 순간인데, 방의 레벨과
+        // 설정은 하필 그때 온다. 화면은 다음 차례에나 에디터로 바뀐다.
+        // 먼저 묻고 돌아가면 방 내용을 통째로 문 앞에서 버리는 셈이다.
+        //
+        // 아래 두 갈래(설정, 레벨 내용)는 에디터 없이도 받아둘 수 있다.
+        // 받아만 두고, 에디터가 생기면 그때 꺼내 쓴다.
 
         if (type == "settings") {
             applyLevelSettings(
@@ -771,6 +790,26 @@ namespace coop {
 
         auto uid = msg["uid"].asString().unwrapOr("");
         if (uid.empty()) return;
+
+        // 여기부터는 레벨을 직접 건드리므로 에디터가 있어야 한다.
+        auto editor = LevelEditorLayer::get();
+        if (!editor) {
+            // 아직 없으면 이것들도 줄에 세워둔다. 버리면 그 편집만 영영 빠진다.
+            if (type == "add" || type == "update") {
+                if (auto data = msg["data"].asString().unwrapOr(""); !data.empty()) {
+                    g_incoming.emplace_back(uid, std::move(data));
+                }
+            } else if (type == "remove") {
+                // 아직 만들지도 않은 것을 지우라는 것이니 줄에서 빼면 된다.
+                std::erase_if(g_incoming, [&uid](auto const& entry) {
+                    return entry.first == uid;
+                });
+            }
+            return;
+        }
+
+        // 레벨을 건드리기 전에 우리 목록이 레벨과 맞는지 확인한다.
+        ensurePresent(editor);
 
         if (type == "add" || type == "update") {
             auto data = msg["data"].asString().unwrapOr("");
