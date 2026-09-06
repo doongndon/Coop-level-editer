@@ -106,6 +106,17 @@ namespace {
         sendRaw(msg);
     }
 
+    // 다시 붙었을 때 돌아갈 방. 이번 게임 안에서만 쓰고 저장하지 않는다.
+    // 메인 스레드에서만 읽고 쓴다.
+    std::string g_pendingRoom;
+
+    // 방에 있다가 끊겼으면 그 방을 기억해둔다. 방 밖이었으면 아무것도 안 한다.
+    void rememberWhereWeWere() {
+        Loader::get()->queueInMainThread([]() {
+            if (!g_currentRoom.empty()) g_pendingRoom = g_currentRoom;
+        });
+    }
+
     void onSocketMessage(ix::WebSocketMessagePtr const& msg) {
         switch (msg->type) {
             case ix::WebSocketMessageType::Open: {
@@ -118,12 +129,22 @@ namespace {
                     solo["on"] = true;
                     sendRaw(solo);
                 }
-                // 연결이 (재)성사되면 마지막에 있던 방으로 돌아가 본다.
-                // 그 방이 이미 사라졌으면 서버가 거절하고, 우리는 방 밖에 남는다.
+                // 연결되면 "가려던 방"이 있을 때만 그리로 간다.
+                //
+                // 예전에는 저장해둔 방 이름을 보고 무조건 들어갔다. 그런데 이
+                // 접속은 게임을 켤 때 로딩 화면에서 일어난다. 손님으로 들어가면
+                // 곧바로 에디터를 여는데, 아직 게임이 다 뜨지도 않은 판에
+                // 화면을 에디터로 갈아치우니 다른 에디터 모드들이 준비도 안 된
+                // 채로 깨어나서 죽었다.
+                //
+                // 그래서 "가려던 방"은 이번 게임에서 실제로 생긴 것만 담는다.
+                // 사용자가 방을 고르거나, 방에 있다가 연결이 끊긴 경우다.
+                // 게임을 켜는 것만으로는 아무 데도 안 들어간다.
                 Loader::get()->queueInMainThread([]() {
-                    if (auto room = savedRoom(); !room.empty()) {
-                        sendRoomAction(g_createOnConnect.exchange(false) ? "create" : "join", room);
-                    }
+                    if (g_pendingRoom.empty()) return;
+                    auto room = g_pendingRoom;
+                    g_pendingRoom.clear();
+                    sendRoomAction(g_createOnConnect.exchange(false) ? "create" : "join", room);
                 });
                 return;
             }
@@ -133,6 +154,7 @@ namespace {
                 g_peerCount = 0;
                 setLastError(msg->errorInfo.reason);
                 log::warn("접속 실패: {}", msg->errorInfo.reason);
+                rememberWhereWeWere();
                 return;
 
             case ix::WebSocketMessageType::Close:
@@ -143,6 +165,7 @@ namespace {
                         ? fmt::format("연결이 끊어졌습니다 ({})", msg->closeInfo.code)
                         : msg->closeInfo.reason
                 );
+                rememberWhereWeWere();
                 return;
 
             case ix::WebSocketMessageType::Message:
@@ -420,6 +443,7 @@ namespace coop {
     void createRoom(std::string room) {
         if (g_state != State::Connected) {
             rememberRoom(room);
+            g_pendingRoom = room;
             g_createOnConnect = true;
             connect();
             return;
@@ -430,6 +454,7 @@ namespace coop {
     void joinRoom(std::string room) {
         if (g_state != State::Connected) {
             rememberRoom(room);
+            g_pendingRoom = room;
             g_createOnConnect = false;
             connect();
             return;
@@ -439,6 +464,8 @@ namespace coop {
 
     void leaveRoom() {
         rememberRoom("");
+        // 나가겠다고 해놓고 다시 붙을 때 도로 들어가면 안 된다.
+        g_pendingRoom.clear();
         if (g_state != State::Connected) {
             g_currentRoom.clear();
             return;

@@ -47,6 +47,9 @@ namespace {
     // 뒤에 지워야 해서 잠시 들고 있는다.
     Ref<GJGameLevel> g_discarded;
 
+    // 게임이 첫 화면까지 떴는지. 여기 오기 전에는 화면을 건드리면 안 된다.
+    bool g_gameReady = false;
+
     // 우리가 방 때문에 에디터를 여는 중이라는 표시.
     // 이게 없으면 새로 열린 에디터가 "에디터에 들어왔으니 방에서 나간다"는
     // 평소 규칙을 그대로 적용해서, 방금 들어간 방에서 곧바로 튕겨 나온다.
@@ -85,6 +88,17 @@ namespace coop {
     }
 
     void openWorkspace(std::string const& room) {
+        // 게임이 아직 뜨는 중이면 아무것도 하지 않는다.
+        //
+        // 로딩 화면에서 에디터를 열면, 아직 준비되지 않은 다른 에디터 모드들이
+        // 그대로 깨어나서 없는 것을 짚고 죽는다. 실제로 게임을 켤 때마다
+        // 튕기던 원인이 이것이었다.
+        if (!g_gameReady) {
+            log::warn("게임이 아직 뜨는 중이라 임시 레벨을 열지 않습니다");
+            coop::leaveRoom();
+            return;
+        }
+
         auto manager = GameLevelManager::sharedState();
         if (!manager) return;
 
@@ -188,6 +202,8 @@ namespace coop {
 class $modify(CoopMenuLayer, MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
+        // 여기까지 왔으면 게임은 다 뜬 것이다.
+        g_gameReady = true;
         coop::sweepOldWorkspaces();
         return true;
     }

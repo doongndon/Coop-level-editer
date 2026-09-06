@@ -127,8 +127,14 @@ function leaveRoom(client, announce = true) {
     room.clients.delete(client);
 
     if (room.clients.size === 0) {
-        room.emptySince = Date.now();
-        console.log(`[비었음] 방 "${room.name}" - 오브젝트 ${room.objects.size}개 보관 중`);
+        // 아무도 없는 방은 곧바로 없앤다.
+        //
+        // 예전에는 두 시간 동안 남겨뒀다. 잠깐 나갔다 오는 사람을 위한 것이었는데,
+        // 실제로는 아무도 없는 방이 목록에 잔뜩 쌓이고, 그 방에 들어가면 예전에
+        // 두고 간 레벨을 손님으로 받게 된다. 방을 만든 사람조차 자기 레벨이
+        // 아닌 옛 레벨을 받는다.
+        rooms.delete(room.name);
+        console.log(`[삭제] 방 "${room.name}" - 마지막 사람이 나가서 없앰`);
     } else if (announce) {
         // 남은 사람들이 이 사람의 커서를 지울 수 있도록 알린다.
         relay(room, client, { type: "left", from: client.clientId });
@@ -182,7 +188,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v9 (solo test)";
+const SERVER_VERSION = "v10 (empty rooms close)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
