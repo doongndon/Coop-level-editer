@@ -55,6 +55,8 @@ namespace coop {
     // 물건이 두 배가 된다.
     void setSoloTest(bool on);
     bool soloTest();
+    // 시험용 기능을 볼 사람인지. 만드는 사람 계정에서만 참.
+    bool isTester();
 
     // 방을 만들거나 들어갈 때 쓸 열쇠. 비워두면 잠그지 않는다.
     // 만들기/들어가기를 부르기 직전에 정해준다.

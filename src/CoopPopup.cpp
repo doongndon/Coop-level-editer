@@ -117,11 +117,15 @@ bool CoopPopup::init() {
     tools->addChild(m_followButton);
 
     // 기기 두 대 없이 커서, 채팅, 선택 표시를 확인해보는 용도.
-    m_soloButton = CCMenuItemExt::createSpriteExtra(
-        ButtonSprite::create("Solo Test", "bigFont.fnt", "GJ_button_05.png", 0.42f),
-        [this](CCMenuItemSpriteExtra*) { this->onSolo(nullptr); }
-    );
-    tools->addChild(m_soloButton);
+    // 만드는 사람 계정에서만 띄운다. 남들에게는 무슨 버튼인지 알 수 없고,
+    // 잘못 누르면 있지도 않은 상대가 있는 것처럼 보인다.
+    if (coop::isTester()) {
+        m_soloButton = CCMenuItemExt::createSpriteExtra(
+            ButtonSprite::create("Solo Test", "bigFont.fnt", "GJ_button_05.png", 0.42f),
+            [this](CCMenuItemSpriteExtra*) { this->onSolo(nullptr); }
+        );
+        tools->addChild(m_soloButton);
+    }
 
     tools->setLayout(RowLayout::create()->setGap(10.f));
     m_mainLayer->addChildAtPosition(tools, Anchor::Bottom, ccp(0.f, 48.f));

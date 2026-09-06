@@ -7,6 +7,7 @@
 #include <Geode/ui/Notification.hpp>
 
 #include <atomic>
+#include <cctype>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -385,6 +386,20 @@ namespace coop {
 
     // 방 만들기와 들어가기는 접속을 다시 하지 않는다. 예전에는 방을 바꿀 때마다
     // 소켓을 끊고 새로 이었는데, 그 사이에 오간 메시지가 사라져서 꼬였다.
+    // 시험용 기능을 볼 사람인지.
+    //
+    // 혼자 시험하기는 만드는 사람이 확인할 때만 쓰는 것이다. 남들 화면에
+    // 띄워두면 무슨 버튼인지 알 수 없고, 잘못 눌러 있지도 않은 상대가
+    // 있는 것처럼 보이게 된다.
+    bool isTester() {
+        auto name = defaultPlayerName();
+        std::string lowered;
+        for (auto ch : name) {
+            lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        return lowered == "0octagon0";
+    }
+
     void setSoloTest(bool on) {
         g_solo = on;
 
