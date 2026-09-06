@@ -104,6 +104,9 @@ namespace coop {
     // 돌아오기를 기다리지 않도록 하기 위한 지름길.
     void noticeObject(GameObject* object);
 
+    // 방의 내용을 다시 받아 내 레벨을 맞춘다. 어긋났을 때 쓴다.
+    void resyncFromRoom();
+
     // 우리가 uid를 붙여 아는 오브젝트 수. 레벨에 있는 수와 다르면 짝을 못 지은
     // 오브젝트가 있다는 뜻이고, 그것이 양쪽 개수가 벌어지는 원인이 된다.
     int trackedCount();

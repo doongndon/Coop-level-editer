@@ -117,6 +117,20 @@ bool CoopPopup::init() {
     );
     tools->addChild(m_followButton);
 
+    // 어긋났을 때 방의 내용을 다시 받아 맞춘다.
+    //
+    // 한 번 어긋나면 스스로 돌아올 길이 없다. 양쪽 다 "내 기억으로는 안 바뀌었는데"
+    // 라고 여기기 때문이다. 둘 다 자기 시계만 보고 서로 맞다고 우기는 셈이라,
+    // 누군가 방의 시계를 다시 봐야 끝난다.
+    tools->addChild(CCMenuItemExt::createSpriteExtra(
+        ButtonSprite::create("Resync", "bigFont.fnt", "GJ_button_02.png", 0.42f),
+        [](CCMenuItemSpriteExtra*) {
+            if (!coop::inRoom()) return;
+            coop::resyncFromRoom();
+            Notification::create("Pulling the room's level again", NotificationIcon::Loading, 3.f)->show();
+        }
+    ));
+
     // 기기 두 대 없이 커서, 채팅, 선택 표시를 확인해보는 용도.
     // 만드는 사람 계정에서만 띄운다. 남들에게는 무슨 버튼인지 알 수 없고,
     // 잘못 누르면 있지도 않은 상대가 있는 것처럼 보인다.
