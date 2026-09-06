@@ -374,7 +374,17 @@ namespace {
             // 그 전에 여기서 따로 붙잡아두어야 아래에서 안전하게 지울 수 있다.
             Ref<GameObject> object = it->second;
             auto previous = g_lastSaved[uid];
-            if (previous == data) return;
+
+            // 기록상 같더라도 물체가 실제로 그런지 확인한다.
+            //
+            // 이 검사 때문에 "다시 맞추기"가 아무 일도 안 했다. 어긋난 물체는
+            // 바로 이 기록과 실제가 다른 것들인데, 기록만 보고 "같네" 하며
+            // 돌아섰다. 장부만 보고 창고를 안 들여다본 셈이다.
+            if (previous == data) {
+                if (!isInLevel(object)) return;
+                if (saveStringOf(object, editor) == data) return;
+                // 실제가 다르다. 아래로 내려가 방의 것에 맞춘다.
+            }
 
             cocos2d::CCPoint moved;
             if (isInLevel(object) && onlyPositionChanged(previous, data, moved)) {
@@ -785,6 +795,13 @@ namespace coop {
         send(std::move(msg));
     }
 
+    // 설정 문자열에서 색 부분(kS38)만 떼어낸다.
+    // levelSettingsString()이 색을 맨 뒤에 붙이므로 뒤쪽을 통째로 자르면 된다.
+    std::string colorPartOf(std::string const& text) {
+        auto at = text.find(",kS38,");
+        return at == std::string::npos ? std::string() : text.substr(at + 6);
+    }
+
     void hushSettings() {
         g_settingsQuiet = QUIET_TICKS;
     }
@@ -809,12 +826,25 @@ namespace coop {
             return;
         }
 
-        // 사람이 실제로 바꿨을 때만 보낸다. 방장이든 손님이든 마찬가지다.
-        //
         // 손님은 방의 설정을 받기 전까지는 아직 자기 레벨이 빈 상태라, 그것을
         // 올리면 방장의 색이 흰 도화지로 덮인다. 그 전까지만 막는다.
-        if (!g_settingsDirty) return;
         if (!g_hosting && !roomSettingsApplied()) return;
+
+        // 사람이 실제로 바꿨을 때만 보낸다.
+        //
+        // 그 신호는 게임이 설정 창을 닫을 때 준다. 그런데 색 창은 그 신호를
+        // 주지 않는다. 색을 바꿔도 아무 말이 없어서, 방에 들어올 때만 색이
+        // 맞고 그 뒤로는 영영 안 맞았다.
+        //
+        // 그래서 색만은 값을 견주어 알아낸다. 바로 위에서 "방금 상대 것을
+        // 반영한 직후"는 이미 걸러냈으므로, 여기서 색이 달라졌다면 그건
+        // 사람이 바꾼 것이다.
+        //
+        // 나머지는 게임에게 물어보고, 말해주지 않는 것 하나만 눈으로 본다.
+        if (!g_settingsDirty && colorPartOf(text) == colorPartOf(g_lastSettings)) {
+            g_lastSettings = text;
+            return;
+        }
 
         auto text = levelSettingsString();
         if (text.empty() || text == g_lastSettings) return;
