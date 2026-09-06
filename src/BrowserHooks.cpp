@@ -54,8 +54,10 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
         if (spot == "top-right") return { right, size.height - 26.f };
         if (spot == "bottom-left") return { left, 26.f };
         if (spot == "bottom-right") return { right, 26.f };
+        if (spot == "left-middle") return { left, size.height * 0.45f };
 
-        // 기본값. 왼쪽 줄에서 GD 버튼들 사이가 비어 있는 높이다.
-        return { left, size.height * 0.45f };
+        // 기본값. 오른쪽 줄 가운데가 이 화면에서 유일하게 비어 있는 자리다.
+        // 왼쪽 가운데에 뒀더니 GD 버튼 하나를 덮었다.
+        return { right, size.height * 0.45f };
     }
 };

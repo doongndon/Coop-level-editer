@@ -21,8 +21,26 @@ namespace {
     }
 }
 
+namespace {
+    // 레벨 목록의 COOP 버튼을 오른쪽으로 옮긴다.
+    //
+    // 기본값만 바꿔서는 이미 쓰던 사람에게 적용되지 않는다. 저장된 값이
+    // 기본값보다 우선하기 때문이다. 왼쪽 가운데는 GD 버튼 하나를 덮고
+    // 있었으므로, 그 값을 쓰고 있던 사람만 한 번 되돌려준다.
+    // 일부러 왼쪽을 고른 사람이 다시 골라도 두 번 옮기지는 않는다.
+    void moveBrowserButtonOnce() {
+        auto mod = Mod::get();
+        if (mod->getSavedValue<bool>("browser-spot-moved", false)) return;
+        mod->setSavedValue<bool>("browser-spot-moved", true);
+
+        if (mod->getSettingValue<std::string>("browser-spot") != "left-middle") return;
+        if (auto setting = mod->getSetting("browser-spot")) setting->reset();
+    }
+}
+
 $on_mod(Loaded) {
     repairServerUrl();
+    moveBrowserButtonOnce();
     coop::connect();
 
     // 설정 화면에서 서버 주소를 바꾸면 곧바로 다시 연결한다.
