@@ -38,9 +38,27 @@ namespace {
     }
 }
 
+namespace {
+    // 에디터 줄을 EDIT 탭 안의 빈 자리로 옮긴다.
+    //
+    // 여기도 저장된 값이 기본값을 이긴다. 예전 기본값(top-left)을 그대로
+    // 쓰고 있고 손으로 옮긴 적도 없는 사람만 한 번 새 자리로 데려온다.
+    // 직접 골랐거나 끌어다 놓은 자리는 건드리지 않는다.
+    void moveEditorBarOnce() {
+        auto mod = Mod::get();
+        if (mod->getSavedValue<bool>("hud-spot-moved", false)) return;
+        mod->setSavedValue<bool>("hud-spot-moved", true);
+
+        if (mod->getSavedValue<bool>("hud-moved", false)) return;
+        if (mod->getSettingValue<std::string>("hud-spot") != "top-left") return;
+        if (auto setting = mod->getSetting("hud-spot")) setting->reset();
+    }
+}
+
 $on_mod(Loaded) {
     repairServerUrl();
     moveBrowserButtonOnce();
+    moveEditorBarOnce();
     coop::connect();
 
     // 설정 화면에서 서버 주소를 바꾸면 곧바로 다시 연결한다.

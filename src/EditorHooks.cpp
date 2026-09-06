@@ -89,11 +89,16 @@ class $modify(CoopEditorUI, EditorUI) {
         auto left = 16.f + half;
         auto right = size.width - 16.f - half;
 
+        if (spot == "top-left") return { left, high };
         if (spot == "top-right") return { right, high };
         if (spot == "bottom-left") return { left, low };
         if (spot == "bottom-right") return { right, low };
         if (spot == "top-center") return { size.width / 2.f, size.height - 11.f };
-        return { left, high };   // top-left
+
+        // 기본값. 아래쪽 EDIT 탭 안, 왼쪽 버튼 뭉치와 방향 버튼들 사이에
+        // 아무것도 없는 자리가 하나 있다. 화면 크기가 달라도 그 자리는
+        // 같은 비율에 있으므로 비율로 잡는다.
+        return { size.width * 0.235f, size.height * 0.135f };
     }
 
     // 위쪽 줄에 들어갈 작은 버튼. 화면을 가리지 않도록 글자만 쓴다.
@@ -240,35 +245,42 @@ class $modify(CoopEditorUI, EditorUI) {
         auto label = m_fields->m_status;
         if (!label) return;
 
+        // EDIT 탭이 열렸을 때만 보여준다. 기본 자리가 그 탭 안의 빈 곳이라,
+        // 탭이 닫혀 있을 때도 띄우면 아무것도 없는 허공에 떠 있게 된다.
+        // GD가 EDIT 버튼 줄을 켜고 끄는 조건과 똑같은 조건을 쓴다.
+        if (auto holder = m_fields->m_holder) {
+            holder->setVisible(this->m_selectedMode == 3);
+        }
+
         switch (coop::state()) {
             case coop::State::Connected: {
                 // 접속만 됐다고 같이 편집되는 게 아니다. 방에 들어가야 한다.
                 // 그 차이를 여기서 분명히 보여줘야 헷갈리지 않는다.
                 if (!coop::inRoom()) {
-                    label->setString("COOP - TAP TO PICK A ROOM");
+                    label->setString("COOP ROOM?");
                     label->setColor({ 255, 180, 90 });
                     break;
                 }
 
                 // 큰 레벨을 받는 중이면 멈춘 것처럼 보인다. 남은 개수를 띄운다.
                 if (auto waiting = coop::pendingCount(); waiting > 0) {
-                    label->setString(fmt::format("COOP - LOADING {}", waiting).c_str());
+                    label->setString(fmt::format("COOP {}...", waiting).c_str());
                     label->setColor({ 255, 220, 90 });
                     break;
                 }
 
                 auto peers = coop::peerCount();
-                label->setString(fmt::format("COOP ON - {} PARTNER(S)", peers).c_str());
+                label->setString(fmt::format("COOP {}P", peers).c_str());
                 // 혼자면 노란색, 상대가 있으면 초록색
                 label->setColor(peers > 0 ? ccColor3B{ 90, 255, 90 } : ccColor3B{ 255, 220, 90 });
                 break;
             }
             case coop::State::Connecting:
-                label->setString("COOP CONNECTING...");
+                label->setString("COOP ...");
                 label->setColor({ 255, 220, 90 });
                 break;
             case coop::State::Disconnected:
-                label->setString("COOP OFF");
+                label->setString("COOP X");
                 label->setColor({ 255, 110, 110 });
                 break;
         }
