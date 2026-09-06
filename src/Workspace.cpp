@@ -87,16 +87,36 @@ namespace coop {
         // 다른 모드들이 화면을 훑고 있는 한복판에서 발밑이 바뀐다. 한 박자
         // 미루면 게임이 하던 일을 끝낸 뒤에 넘어간다.
         Loader::get()->queueInMainThread([level = Ref<GJGameLevel>(level)]() {
-            // LevelEditorLayer::scene은 윈도우에서 쓸 수 없어서 씬을 직접 만든다.
-            // 하는 일은 같다. 빈 씬에 에디터를 얹는 것뿐이다.
-            auto scene = CCScene::create();
-            scene->addChild(LevelEditorLayer::create(level.data(), false));
+            // 이미 에디터 안에서 부른 것인지. 새 에디터를 만들기 전에 봐야 한다.
+            // 만들고 나면 게임이 들고 있는 "지금 에디터"가 새것으로 바뀐다.
+            auto fromEditor = LevelEditorLayer::get() != nullptr;
 
-            // GD도 에디터에 들어갈 때 어둡게 넘긴다. 그냥 바꿔치우면 다른 모드가
-            // 미처 준비되지 않은 화면을 훑게 될 수 있다.
-            CCDirector::sharedDirector()->replaceScene(
-                CCTransitionFade::create(0.5f, scene)
-            );
+            // LevelEditorLayer::scene은 윈도우에서 쓸 수 없어서 씬을 직접 만든다.
+            // 다만 GD가 하는 세 가지를 하나도 빠뜨리면 안 된다.
+            //
+            // 처음에는 "빈 씬에 에디터를 얹는 것뿐"이라고 보고 가운데 한 줄만
+            // 옮겼는데, 그게 크래시의 원인이었다. 다른 에디터 모드들은 씬에
+            // 찍힌 표시(objType)를 보고 "여기가 에디터구나" 하고 자기 준비를
+            // 한다. 표시가 없으면 준비를 건너뛰고, 그래놓고 화면이 돌기
+            // 시작하면 준비되지 않은 자리를 짚어서 게임이 죽는다.
+            // 문패 없는 가게에 배달이 안 오는 것과 같다.
+            auto scene = CCScene::create();
+            if (auto app = AppDelegate::get()) app->m_runningScene = scene;
+            scene->addChild(LevelEditorLayer::create(level.data(), false));
+            scene->setObjType(CCObjectType::LevelEditorLayer);
+
+            auto director = CCDirector::sharedDirector();
+            if (fromEditor) {
+                // 방을 옮기는 경우다. 어둡게 넘기면 그 0.5초 동안 옛 에디터와
+                // 새 에디터가 같이 살아서 둘 다 돌아간다. 다른 모드들은 에디터가
+                // 하나뿐이라고 보고 만들어져 있어서 이때 자주 엉킨다.
+                // 여기서는 연출 없이 바로 바꿔 옛 에디터를 즉시 끝낸다.
+                director->replaceScene(scene);
+            } else {
+                // GD도 에디터에 들어갈 때 어둡게 넘긴다. 그냥 바꿔치우면 다른
+                // 모드가 미처 준비되지 않은 화면을 훑게 될 수 있다.
+                director->replaceScene(CCTransitionFade::create(0.5f, scene));
+            }
         });
     }
 
