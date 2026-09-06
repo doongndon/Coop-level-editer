@@ -17,6 +17,13 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
     bool init(GJSearchObject* object) {
         if (!LevelBrowserLayer::init(object)) return false;
 
+        // 남은 임시 레벨을 여기서도 치운다.
+        //
+        // 첫 화면에서만 치우면, 에디터에서 곧장 레벨 목록으로 돌아온 경우에는
+        // 그 레벨이 목록에 보인 채로 남는다. 사람들이 실제로 보는 자리가
+        // 여기라서, 여기서도 한 번 훑어야 "남았다"는 말이 안 나온다.
+        coop::sweepOldWorkspaces();
+
         // 온라인 검색 결과 같은 곳에는 띄우지 않는다. 내 레벨 목록에서만
         // 의미가 있고, 다른 화면에서는 자리만 차지한다.
         if (!object) return true;

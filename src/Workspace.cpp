@@ -168,8 +168,15 @@ namespace coop {
         auto manager = GameLevelManager::sharedState();
         if (!local || !manager || !local->m_localLevels) return;
 
-        // 지금 그 레벨에서 작업 중이면 지우면 안 된다.
-        auto inUse = g_workspace.data();
+        // 지금 그 레벨의 에디터 안에 있을 때만 남겨둔다.
+        //
+        // 예전에는 "우리가 마지막으로 만든 임시 레벨"이면 무조건 건너뛰었다.
+        // 그런데 나가는 길에서 정리가 한 번이라도 어긋나면 그 레벨은 영영
+        // 건너뛰기 대상으로 남아, 목록에 그대로 눌러앉는다.
+        //
+        // 이 훑기는 첫 화면과 레벨 목록에서만 돈다. 거기서는 에디터가 열려
+        // 있을 수가 없으니, 사실상 남은 것은 전부 지운다.
+        auto inUse = inWorkspace() ? g_workspace.data() : nullptr;
 
         // 지우는 동안 목록이 줄어들므로 먼저 따로 담는다.
         std::vector<Ref<GJGameLevel>> doomed;
