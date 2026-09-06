@@ -59,10 +59,11 @@ bool CoopPopup::init() {
     auto actions = CCMenu::create();
     actions->setContentSize({ 320.f, 32.f });
 
-    actions->addChild(CCMenuItemExt::createSpriteExtra(
+    m_createButton = CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("Create Room", "bigFont.fnt", "GJ_button_01.png", 0.55f),
         [this](CCMenuItemSpriteExtra*) { this->onCreate(nullptr); }
-    ));
+    );
+    actions->addChild(m_createButton);
 
     m_leaveButton = CCMenuItemExt::createSpriteExtra(
         ButtonSprite::create("Leave", "bigFont.fnt", "GJ_button_05.png", 0.55f),
@@ -246,6 +247,12 @@ void CoopPopup::tick(float) {
         m_leaveButton->setEnabled(coop::inRoom());
     }
 
+    // 방을 만들려면 올릴 레벨이 열려 있어야 한다. 레벨 목록에서 연 창에서는
+    // 올릴 것이 없으니 들어가기만 된다.
+    if (m_createButton) {
+        m_createButton->setEnabled(coop::canHost());
+    }
+
     if (m_statusLabel) {
         switch (coop::state()) {
             case coop::State::Connected: {
@@ -276,6 +283,14 @@ void CoopPopup::tick(float) {
 }
 
 void CoopPopup::onCreate(CCMenuItemSpriteExtra*) {
+    if (!coop::canHost()) {
+        Notification::create(
+            "Open a level in the editor first, then Create Room",
+            NotificationIcon::Warning, 5.f
+        )->show();
+        return;
+    }
+
     auto room = std::string(m_roomInput->getString());
     if (room.empty()) {
         room = coop::suggestedRoomName();
@@ -344,8 +359,8 @@ void CoopPopup::askJoin(std::string const& name, bool locked) {
         )
         : fmt::format(
             "Join <cy>{}</c>?\n\n"
-            "You will move to a temporary level for that room.\n"
-            "Your own levels are not touched.", name
+            "You will work in a temporary level named\n<cg>[COOP] {}</c>.\n"
+            "It is deleted when you leave, and your own\nlevels are not touched.", name, name
         );
 
     geode::createQuickPopup(

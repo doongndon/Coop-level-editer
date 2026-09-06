@@ -18,6 +18,7 @@ protected:
     geode::TextInput* m_roomInput = nullptr;
     geode::TextInput* m_passwordInput = nullptr;
     cocos2d::CCMenu* m_roomListMenu = nullptr;
+    CCMenuItemSpriteExtra* m_createButton = nullptr;
     CCMenuItemSpriteExtra* m_leaveButton = nullptr;
     CCMenuItemSpriteExtra* m_updateButton = nullptr;
     CCMenuItemSpriteExtra* m_followButton = nullptr;

@@ -447,6 +447,11 @@ namespace coop {
         send(std::move(msg));
     }
 
+    // 방을 만들려면 올릴 레벨이 열려 있어야 한다.
+    bool canHost() {
+        return LevelEditorLayer::get() != nullptr;
+    }
+
     void uploadWholeLevel() {
         // 대응표가 비어 있으면 다음 검사에서 레벨의 모든 오브젝트가
         // "처음 보는 것"이 되어 차례로 방에 올라간다.

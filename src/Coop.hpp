@@ -100,6 +100,10 @@ namespace coop {
     // 돌아오기를 기다리지 않도록 하기 위한 지름길.
     void noticeObject(GameObject* object);
 
+    // 방을 만들려면 올릴 레벨이 열려 있어야 한다.
+    // 레벨 목록에서 창을 열었을 때는 만들기를 막아야 한다.
+    bool canHost();
+
     // 방장이 될 때: 지금 레벨에 있는 것을 전부 방에 올린다.
     void uploadWholeLevel();
     // 손님이 될 때: 내 레벨을 비운다. 방의 레벨을 그대로 받기 위해서다.
