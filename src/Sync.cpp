@@ -743,12 +743,12 @@ namespace coop {
             return;
         }
 
-        // 손님은 방의 설정을 받기 전까지 자기 것을 올리지 않는다.
+        // 배경, 바닥, 색깔, 노래는 방장 것 하나만 쓴다.
         //
-        // 손님은 텅 빈 임시 레벨에서 시작한다. 그 기본 색깔을 먼저 올려버리면
-        // 방장의 색깔이 손님의 흰 도화지로 덮인다. 실제로 그렇게 되고 있었다.
-        // 새로 온 사람이 남의 집 벽지를 자기 집 기본 벽지로 발라버리는 셈이다.
-        if (!g_hosting && !roomSettingsApplied()) return;
+        // 양쪽이 다 올리면 서로 덮으며 끝나지 않는다. 두 사람이 같은 벽을
+        // 각자 다른 색으로 계속 칠하는 것과 같다. 원본이 방장의 레벨이니
+        // 벽지도 그 집 것을 따른다. 손님은 받아서 그대로 쓴다.
+        if (!g_hosting) return;
 
         auto text = levelSettingsString();
         if (text.empty() || text == g_lastSettings) return;

@@ -172,6 +172,8 @@ namespace {
 
     // 마지막으로 화면에 반영한 설정(색 제외). 같은 내용이면 다시 그리지 않는다.
     std::string g_appliedRest;
+    // 마지막으로 화면에 반영한 색 내용.
+    std::string g_appliedColors;
 
     // 방의 설정을 한 번이라도 받아서 반영했는지.
     //
@@ -299,6 +301,7 @@ namespace coop {
 
     void forgetAppliedSettings() {
         g_appliedRest.clear();
+        g_appliedColors.clear();
         g_haveRoomSettings = false;
 
         // 받아만 두고 아직 못 쓴 설정(g_held)은 여기서 버리지 않는다.
@@ -463,11 +466,21 @@ namespace coop {
             queueSongList(songList);
         }
 
-        // levelSettingsUpdated()는 배경과 바닥을 통째로 다시 그린다.
-        // 색만 바뀌었을 때까지 부르면 색을 고르는 동안 화면이 계속 깜빡인다.
-        // 그래서 색이 아닌 항목이 실제로 달라졌을 때만 부른다.
-        if (rest != g_appliedRest) {
+        // 화면을 다시 그린다.
+        //
+        // 색 통로 값을 고쳐 넣는 것만으로는 배경과 바닥이 안 바뀐다. 게임은
+        // 설정 창을 닫을 때 levelSettingsUpdated()로 그것들을 다시 만든다.
+        // 그 말을 안 해줘서, 색은 제대로 도착해 적용까지 됐는데(ok 11) 화면은
+        // 그대로였다. 페인트를 바꿔놓고 칠하라는 말을 안 한 셈이다.
+        //
+        // 예전에는 색만 바뀐 경우에 이걸 건너뛰었다. 색을 고르는 동안 화면이
+        // 깜빡일까 봐서였는데, 그 대가가 "색이 아예 안 맞는 것"이었다.
+        // 내용이 진짜로 달라졌을 때만 부르므로 같은 값이 반복해서 와도
+        // 깜빡이지 않는다.
+        auto colorsChanged = incomingColors != g_appliedColors;
+        if (rest != g_appliedRest || colorsChanged) {
             g_appliedRest = rest;
+            g_appliedColors = incomingColors;
 
             // GD가 설정 창을 닫을 때 부르는 것과 같은 함수다.
             editor->levelSettingsUpdated();
