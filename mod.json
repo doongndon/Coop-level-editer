@@ -4,7 +4,7 @@
         "win": "2.2081",
         "android": "2.2081"
     },
-    "version": "v0.11.0",
+    "version": "v0.12.0",
     "id": "com.yourname.coopedit",
     "name": "Coop Level Editor",
     "developer": "yourname",
@@ -39,6 +39,12 @@
             "description": "Connect to the server when you open the editor. You still pick the room yourself.",
             "type": "bool",
             "default": true
+        },
+        "tiny-hud": {
+            "name": "Tiny Editor Bar",
+            "description": "Show only a small COOP dot at the top of the editor instead of the status text. The room window still opens from it.",
+            "type": "bool",
+            "default": false
         }
     }
 }

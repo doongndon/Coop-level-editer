@@ -20,14 +20,18 @@ class $modify(CoopEditorUI, EditorUI) {
         CCLabelBMFont* m_chatLabel = nullptr;
         CCMenuItemSpriteExtra* m_chatButton = nullptr;
         CCMenuItemSpriteExtra* m_followButton = nullptr;
+        // 글자 뒤에 까는 어두운 판.
+        //
+        // 에디터 위쪽에는 GD 버튼이 없지만 레벨은 화면 전체에 깔려 있다.
+        // 판 없이 글자만 얹으면 물체 위에 겹쳐서 둘 다 안 보인다.
+        cocos2d::CCLayerColor* m_plate = nullptr;
     };
 
     // 위쪽 줄에 들어갈 작은 버튼. 화면을 가리지 않도록 글자만 쓴다.
     CCMenuItemSpriteExtra* makeSmallButton(
         CCLabelBMFont* label, std::function<void(CCMenuItemSpriteExtra*)> action
     ) {
-        label->setScale(0.3f);
-        label->setOpacity(200);
+        label->setScale(0.24f);
         return CCMenuItemExt::createSpriteExtra(label, std::move(action));
     }
 
@@ -35,8 +39,7 @@ class $modify(CoopEditorUI, EditorUI) {
         if (!EditorUI::init(editorLayer)) return false;
 
         auto label = CCLabelBMFont::create("COOP", "bigFont.fnt");
-        label->setScale(0.3f);
-        label->setOpacity(200);
+        label->setScale(0.24f);
         m_fields->m_status = label;
 
         // 상태 표시 자체를 버튼으로 쓴다. 따로 아이콘을 두지 않아도
@@ -78,8 +81,18 @@ class $modify(CoopEditorUI, EditorUI) {
         menu->setZOrder(1000);
 
         auto winSize = CCDirector::get()->getWinSize();
-        menu->setPosition({ winSize.width / 2.f, winSize.height - 14.f });
+        auto spot = cocos2d::CCPoint(winSize.width / 2.f, winSize.height - 11.f);
 
+        // 판을 먼저 넣어야 글자 뒤로 간다.
+        auto plate = CCLayerColor::create({ 0, 0, 0, 130 }, 10.f, 18.f);
+        plate->setIgnoreAnchorPointForPosition(false);
+        plate->setAnchorPoint({ 0.5f, 0.5f });
+        plate->setPosition(spot);
+        plate->setZOrder(999);
+        this->addChild(plate);
+        m_fields->m_plate = plate;
+
+        menu->setPosition(spot);
         this->addChild(menu);
         m_fields->m_menu = menu;
 
@@ -152,6 +165,12 @@ class $modify(CoopEditorUI, EditorUI) {
                 break;
         }
 
+        // 작게 쓰기를 켜두면 상태 글자를 "COOP"으로만 줄인다.
+        // 창은 여전히 여기서 열 수 있어야 하므로 아예 없애지는 않는다.
+        if (Mod::get()->getSettingValue<bool>("tiny-hud")) {
+            label->setString("COOP");
+        }
+
         // 채팅과 따라가기는 방에 있을 때만 쓸모가 있다. 혼자일 때 띄워두면
         // 편집 화면만 가린다.
         auto inRoom = coop::inRoom();
@@ -174,6 +193,23 @@ class $modify(CoopEditorUI, EditorUI) {
 
         if (auto menu = m_fields->m_menu) {
             menu->updateLayout();
+
+            // 판을 지금 보이는 글자 폭에 맞춘다. 고정 폭으로 두면 짧은 글자일 때
+            // 쓸데없이 넓은 검은 띠가 화면을 가린다.
+            if (auto plate = m_fields->m_plate) {
+                float width = 0.f;
+                int shown = 0;
+                auto children = menu->getChildren();
+                for (auto child : CCArrayExt<CCNode*>(children ? children : CCArray::create())) {
+                    if (!child->isVisible()) continue;
+                    width += child->getScaledContentSize().width;
+                    ++shown;
+                }
+                if (shown > 1) width += (shown - 1) * 14.f;
+
+                plate->setContentSize({ width + 16.f, 18.f });
+                plate->setVisible(width > 0.f);
+            }
         }
     }
 
