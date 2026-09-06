@@ -5,6 +5,8 @@
 
 #include <Geode/ui/Notification.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <functional>
 
 using namespace geode::prelude;
@@ -27,15 +29,55 @@ class $modify(CoopEditorUI, EditorUI) {
         // 에디터 위쪽에는 GD 버튼이 없지만 레벨은 화면 전체에 깔려 있다.
         // 판 없이 글자만 얹으면 물체 위에 겹쳐서 둘 다 안 보인다.
         cocos2d::CCLayerColor* m_plate = nullptr;
+
+        // 판과 글자와 손잡이를 한 덩어리로 묶는 그릇.
+        // 자리를 옮길 때 이것 하나만 움직이면 된다.
+        cocos2d::CCNode* m_holder = nullptr;
+        // 왼쪽 끝의 작은 손잡이. 여기를 끌면 줄 전체가 따라온다.
+        cocos2d::CCLayerColor* m_grip = nullptr;
+        bool m_dragging = false;
+        // 첫 자리를 한 번 잡았는지. 그 뒤로는 설정을 다시 읽지 않는다.
+        bool m_hudPlaced = false;
+        cocos2d::CCPoint m_grabOffset;
+        float m_plateWidth = 0.f;
     };
 
-    // 표시를 놓을 자리.
+    // 줄이 화면 밖으로 나가지 않게 붙잡는다.
+    // 폭을 받는 이유는, 가운데 좌표를 폭에 맞춰 밀어야 끝이 잘리지 않기 때문이다.
+    cocos2d::CCPoint clampSpot(cocos2d::CCPoint spot, float width) {
+        auto size = CCDirector::get()->getWinSize();
+        auto half = width / 2.f;
+        // 왼쪽은 손잡이 몫까지 더 비워둔다.
+        auto left = 26.f + half;
+        auto right = size.width - 6.f - half;
+        if (left > right) left = right = size.width / 2.f;
+
+        spot.x = std::clamp(spot.x, left, right);
+        spot.y = std::clamp(spot.y, 12.f, size.height - 12.f);
+        return spot;
+    }
+
+    // 실제로 쓸 자리. 손으로 옮긴 적이 있으면 그 자리, 아니면 설정에서 고른 구석.
+    cocos2d::CCPoint barSpot(float width) {
+        auto mod = Mod::get();
+        if (!mod->getSavedValue<bool>("hud-moved", false)) {
+            return this->coopBarSpot(width);
+        }
+
+        // 기기마다 화면 크기가 달라서 좌표를 그대로 적어두면 못 쓴다.
+        // 비율로 적어두고 그때그때 화면 크기에 곱한다.
+        auto size = CCDirector::get()->getWinSize();
+        auto x = static_cast<float>(mod->getSavedValue<double>("hud-x", 0.2));
+        auto y = static_cast<float>(mod->getSavedValue<double>("hud-y", 0.85));
+        return this->clampSpot({ x * size.width, y * size.height }, width);
+    }
+
+    // 설정에서 고르는 기본 구석.
     //
     // 처음에는 위쪽 가운데에 뒀는데 거기는 레벨 스크롤 막대가 지나가는 자리다.
     // 에디터는 사방이 버튼이라 어디가 비었는지는 쓰는 사람 화면마다 다르다.
-    // 그래서 자리를 설정에서 고르게 했다.
-    // 폭을 받는 이유는, 구석에 붙일 때 가운데 좌표를 폭에 맞춰 밀어야
-    // 화면 밖으로 삐져나가지 않기 때문이다.
+    // 네 구석을 고르게 해도 여전히 누군가에게는 걸린다. 그래서 이제는 손잡이를
+    // 달아 직접 끌어다 놓게 했다. 이 함수는 옮기기 전의 첫 자리만 정한다.
     cocos2d::CCPoint coopBarSpot(float width) {
         auto size = CCDirector::get()->getWinSize();
         auto spot = Mod::get()->getSettingValue<std::string>("hud-spot");
@@ -107,7 +149,12 @@ class $modify(CoopEditorUI, EditorUI) {
         menu->setLayout(RowLayout::create()->setGap(14.f)->ignoreInvisibleChildren(true));
         menu->setZOrder(1000);
 
-        auto spot = this->coopBarSpot(0.f);
+        // 판, 글자, 손잡이를 한 그릇에 담는다. 자리를 옮길 때 그릇만 움직이면
+        // 안의 것들이 서로 어긋나지 않고 따라온다.
+        auto holder = CCNode::create();
+        holder->setZOrder(999);
+        this->addChild(holder);
+        m_fields->m_holder = holder;
 
         // 판을 먼저 넣어야 글자 뒤로 간다.
         auto plate = CCLayerColor::create({ 0, 0, 0, 130 }, 10.f, 18.f);
@@ -115,14 +162,23 @@ class $modify(CoopEditorUI, EditorUI) {
         // 이름에 set이 없는 함수다.
         plate->ignoreAnchorPointForPosition(false);
         plate->setAnchorPoint({ 0.5f, 0.5f });
-        plate->setPosition(spot);
-        plate->setZOrder(999);
-        this->addChild(plate);
+        holder->addChild(plate);
         m_fields->m_plate = plate;
 
-        menu->setPosition(spot);
-        this->addChild(menu);
+        // 왼쪽 끝의 손잡이.
+        //
+        // 자리를 몇 번이나 옮겨봤지만 화면마다 비어 있는 곳이 달라서 늘
+        // 누군가에게는 걸렸다. 어디가 비었는지는 쓰는 사람이 제일 잘 안다.
+        auto grip = CCLayerColor::create({ 255, 255, 255, 110 }, 11.f, 18.f);
+        grip->ignoreAnchorPointForPosition(false);
+        grip->setAnchorPoint({ 0.5f, 0.5f });
+        holder->addChild(grip);
+        m_fields->m_grip = grip;
+
+        holder->addChild(menu);
         m_fields->m_menu = menu;
+
+        holder->setPosition(this->barSpot(0.f));
 
         coop::clearCursors();
 
@@ -258,11 +314,24 @@ class $modify(CoopEditorUI, EditorUI) {
                 plate->setContentSize({ plateWidth, 18.f });
                 plate->setVisible(width > 0.f);
 
-                // 자리는 폭이 정해진 다음에 잡는다. 설정에서 바꿨을 수도 있으니
-                // 매번 다시 맞춘다.
-                auto spot = this->coopBarSpot(plateWidth);
-                plate->setPosition(spot);
-                menu->setPosition(spot);
+                if (auto grip = m_fields->m_grip) {
+                    // 손잡이는 판 왼쪽 바깥에 붙인다.
+                    grip->setPosition({ -(plateWidth / 2.f + 9.f), 0.f });
+                    grip->setVisible(plate->isVisible());
+                }
+
+                m_fields->m_plateWidth = plateWidth;
+
+                // 자리는 폭이 정해진 다음에 잡는다. 끄는 중에는 손이 정한
+                // 자리를 그대로 둔다. 안 그러면 손가락에서 도망간다.
+                if (auto holder = m_fields->m_holder; holder && !m_fields->m_dragging) {
+                    holder->setPosition(
+                        m_fields->m_hudPlaced
+                            ? this->clampSpot(holder->getPosition(), plateWidth)
+                            : this->barSpot(plateWidth)
+                    );
+                    m_fields->m_hudPlaced = true;
+                }
             }
         }
     }
@@ -292,20 +361,79 @@ class $modify(CoopEditorUI, EditorUI) {
         }
     }
 
+    // 손잡이를 잡았는지 본다. 잡았으면 이 손짓은 에디터로 넘기지 않는다.
+    // 넘기면 옮기는 동안 뒤에서 물체가 놓이거나 선택틀이 그려진다.
+    bool grabbedGrip(CCTouch* touch) {
+        auto holder = m_fields->m_holder;
+        auto grip = m_fields->m_grip;
+        if (!holder || !grip || !grip->isVisible() || !touch) return false;
+
+        auto center = holder->convertToWorldSpace(grip->getPosition());
+        auto where = touch->getLocation();
+        // 손가락은 뭉툭하다. 보이는 것보다 넉넉하게 잡아준다.
+        if (std::fabs(where.x - center.x) > 22.f) return false;
+        if (std::fabs(where.y - center.y) > 20.f) return false;
+
+        m_fields->m_dragging = true;
+        m_fields->m_grabOffset = holder->getPosition() - where;
+        return true;
+    }
+
+    void dragTo(CCTouch* touch) {
+        auto holder = m_fields->m_holder;
+        if (!holder || !touch) return;
+        holder->setPosition(this->clampSpot(
+            touch->getLocation() + m_fields->m_grabOffset, m_fields->m_plateWidth
+        ));
+    }
+
+    void releaseGrip() {
+        m_fields->m_dragging = false;
+
+        auto holder = m_fields->m_holder;
+        if (!holder) return;
+        auto size = CCDirector::get()->getWinSize();
+        if (size.width <= 0.f || size.height <= 0.f) return;
+
+        auto spot = holder->getPosition();
+        Mod::get()->setSavedValue<double>("hud-x", spot.x / size.width);
+        Mod::get()->setSavedValue<double>("hud-y", spot.y / size.height);
+        Mod::get()->setSavedValue<bool>("hud-moved", true);
+    }
+
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) {
+        if (this->grabbedGrip(touch)) return true;
         auto handled = EditorUI::ccTouchBegan(touch, event);
         this->tellWhereIAm(touch);
         return handled;
     }
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) {
+        if (m_fields->m_dragging) {
+            this->dragTo(touch);
+            return;
+        }
         EditorUI::ccTouchMoved(touch, event);
         this->tellWhereIAm(touch);
     }
 
     void ccTouchEnded(CCTouch* touch, CCEvent* event) {
+        if (m_fields->m_dragging) {
+            this->releaseGrip();
+            return;
+        }
         EditorUI::ccTouchEnded(touch, event);
         this->tellWhereIAm(touch);
+    }
+
+    // 손짓이 도중에 취소되는 일도 있다. 여기서 놓아주지 않으면 손을 뗀 뒤에도
+    // 계속 끌려다닌다.
+    void ccTouchCancelled(CCTouch* touch, CCEvent* event) {
+        if (m_fields->m_dragging) {
+            this->releaseGrip();
+            return;
+        }
+        EditorUI::ccTouchCancelled(touch, event);
     }
 
     GameObject* createObject(int objectID, CCPoint position) {

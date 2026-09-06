@@ -30,6 +30,12 @@ $on_mod(Loaded) {
         coop::connect();
     });
 
+    // 구석을 다시 고르면, 손으로 옮겨둔 자리는 잊는다.
+    // 안 그러면 설정을 바꿔도 아무 일이 안 일어나서 고장 난 줄 안다.
+    listenForSettingChanges<std::string>("hud-spot", [](std::string) {
+        Mod::get()->setSavedValue<bool>("hud-moved", false);
+    });
+
     // room-name은 감시하지 않는다. 이 값은 모드가 방에 들어갈 때마다 스스로
     // 적어 넣기 때문에, 여기서 다시 연결하면 방을 바꿀 때마다 접속이 끊기고
     // 심하면 접속 -> 저장 -> 접속이 끝없이 반복된다.

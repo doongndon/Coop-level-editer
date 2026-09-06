@@ -1,6 +1,7 @@
 #include "Coop.hpp"
 
 #include <Geode/ui/Notification.hpp>
+#include <Geode/utils/file.hpp>
 #include <Geode/utils/web.hpp>
 
 #include <atomic>
@@ -126,11 +127,39 @@ namespace coop {
                 out.write(reinterpret_cast<char const*>(bytes.data()), bytes.size());
             }
 
+            // 받은 것이 정말 쓸 수 있는 모드 파일인지 먼저 확인한다.
+            //
+            // 크기만 보고 넘겼더니 모드가 통째로 죽은 적이 있다. 빌드가 올라가는
+            // 도중에 받으면 절반만 받아지는데, 절반짜리도 크기 검사는 통과한다.
+            // 그걸 자리에 앉히면 Geode가 풀다가 실패하면서 이미 풀어뒀던 것까지
+            // 지워버려서, 다음에 켤 때 "이 기기용 파일이 없다"며 아예 안 켜진다.
+            //
+            // 이사할 때 새 집 문이 열리는지 먼저 확인하고 옛 집 열쇠를 반납하는
+            // 것과 같다. 확인 전에는 옛 파일을 건드리지 않는다.
+            auto binaryName = std::string(Mod::get()->getMetadata().getBinaryName());
+            auto dropTemporary = [&temporary]() {
+                std::error_code ignored;
+                std::filesystem::remove(temporary, ignored);
+            };
+
+            {
+                auto opened = file::Unzip::create(temporary);
+                if (!opened) {
+                    dropTemporary();
+                    finish(false, "The download was broken. Nothing was changed");
+                    return;
+                }
+                if (!opened.unwrap().hasEntry(binaryName)) {
+                    dropTemporary();
+                    finish(false, "That build has no file for this device");
+                    return;
+                }
+            }
+
             std::error_code ec;
             std::filesystem::rename(temporary, target, ec);
             if (ec) {
-                std::error_code ignored;
-                std::filesystem::remove(temporary, ignored);
+                dropTemporary();
                 finish(false, fmt::format("Could not replace the mod ({})", ec.message()));
                 return;
             }
@@ -139,19 +168,22 @@ namespace coop {
             //
             // Geode는 mod.json은 파일에서 새로 읽지만, 실행할 코드는 예전에
             // 풀어둔 것을 그대로 다시 쓴다. 그래서 버전 표시만 새것이 되고
-            // 동작은 옛것으로 남는다. 풀어둔 것을 치워야 다음에 켤 때 새로 푼다.
-            std::error_code binEc;
-            auto binary = Mod::get()->getBinaryPath();
-            if (!std::filesystem::remove(binary, binEc)) {
-                // 윈도우는 지금 실행 중인 파일을 지우지 못한다.
-                // 이름만 바꿔놔도 Geode가 없는 것으로 보고 새로 푼다.
-                std::error_code renameEc;
-                std::filesystem::rename(binary, binary.string() + ".old", renameEc);
-                if (renameEc) {
-                    finish(false, "Downloaded, but could not clear the old binary");
-                    return;
-                }
-            }
+            // 동작은 옛것으로 남는다.
+            //
+            // 예전에는 풀어둔 실행 파일을 직접 지웠다. 그런데 그러면 새 파일에
+            // 문제가 있을 때 돌아갈 자리가 없어진다. 대신 Geode가 "다시 풀어야
+            // 하나"를 판단할 때 보는 표시만 지운다. 그러면 다음에 켤 때 무조건
+            // 새로 푼다.
+            std::error_code markEc;
+            std::filesystem::remove(
+                dirs::getModRuntimeDir() / Mod::get()->getID() / "modified-at", markEc
+            );
+
+            // 옛 판이 남겨놓은 찌꺼기도 치운다.
+            std::error_code oldEc;
+            std::filesystem::remove(
+                Mod::get()->getBinaryPath().string() + ".old", oldEc
+            );
 
             finish(true, "Updated! Restart GD to use it");
         }).detach();

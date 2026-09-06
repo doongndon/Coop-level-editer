@@ -4,7 +4,7 @@
         "win": "2.2081",
         "android": "2.2081"
     },
-    "version": "v0.19.1",
+    "version": "v0.20.0",
     "id": "com.yourname.coopedit",
     "name": "Coop Level Editor",
     "developer": "yourname",
@@ -48,7 +48,7 @@
         },
         "hud-spot": {
             "name": "Editor Bar Spot",
-            "description": "Where the small COOP bar sits. top-center overlaps the level scroll bar, so it is not the default.",
+            "description": "Where the COOP bar starts in the editor. You can also drag it anywhere by the small white handle on its left; changing this setting forgets where you dragged it.",
             "type": "string",
             "default": "top-left",
             "one-of": [
