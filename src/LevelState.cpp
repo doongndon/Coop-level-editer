@@ -300,8 +300,16 @@ namespace coop {
     void forgetAppliedSettings() {
         g_appliedRest.clear();
         g_haveRoomSettings = false;
-        // 방이 바뀌면 옛 방의 설정을 들고 있을 이유가 없다.
-        g_held = {};
+
+        // 받아만 두고 아직 못 쓴 설정(g_held)은 여기서 버리지 않는다.
+        //
+        // 이 함수는 에디터를 새로 열 때도 불린다. 손님은 방에 들어간 직후
+        // 설정을 받아 들고 있다가, 임시 에디터가 열리면 그때 쓴다. 그런데
+        // 그 에디터가 열리는 바로 그 순간에 여기서 버려버리고 있었다.
+        // 색깔이 안 오던 원인의 절반이 이것이다.
+        //
+        // 여기서 잊는 것은 "이미 화면에 반영한 것"까지다. 손에 들고 있는
+        // 편지를 뜯기도 전에 버리면 안 된다.
         g_wantedSongs.clear();
         g_songAttempts = 0;
         g_songWait = 0;

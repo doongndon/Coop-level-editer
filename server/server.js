@@ -188,7 +188,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v10 (empty rooms close)";
+const SERVER_VERSION = "v11 (resync sends settings)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -323,6 +323,13 @@ wss.on("connection", client => {
         switch (msg.type) {
             // 에디터에 새로 들어왔으니 현재 상태를 다시 달라는 요청
             case "resync":
+                // 설정도 같이 보낸다.
+                //
+                // 오브젝트만 보내던 것이 색깔이 안 맞던 진짜 원인이었다.
+                // 손님은 임시 에디터가 열리는 순간 자기 기록을 비우고 다시
+                // 달라고 하는데, 그때 오브젝트만 돌아오고 배경과 색깔은
+                // 영영 오지 않았다. 물건은 다시 받고 벽지는 못 받은 셈이다.
+                if (room.settings) sendTo(client, room.settings);
                 sendState(room, client);
                 return;
 
