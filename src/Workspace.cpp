@@ -81,11 +81,23 @@ namespace coop {
         g_workspace = level;
         g_opening = true;
 
-        // LevelEditorLayer::scene은 윈도우에서 쓸 수 없어서 씬을 직접 만든다.
-        // 하는 일은 같다. 빈 씬에 에디터를 얹는 것뿐이다.
-        auto scene = CCScene::create();
-        scene->addChild(LevelEditorLayer::create(level, false));
-        CCDirector::sharedDirector()->replaceScene(scene);
+        // 화면 교체는 다음 차례로 미룬다.
+        //
+        // 여기는 서버 메시지를 처리하는 도중이다. 그 자리에서 씬을 갈아치우면
+        // 다른 모드들이 화면을 훑고 있는 한복판에서 발밑이 바뀐다. 한 박자
+        // 미루면 게임이 하던 일을 끝낸 뒤에 넘어간다.
+        Loader::get()->queueInMainThread([level = Ref<GJGameLevel>(level)]() {
+            // LevelEditorLayer::scene은 윈도우에서 쓸 수 없어서 씬을 직접 만든다.
+            // 하는 일은 같다. 빈 씬에 에디터를 얹는 것뿐이다.
+            auto scene = CCScene::create();
+            scene->addChild(LevelEditorLayer::create(level.data(), false));
+
+            // GD도 에디터에 들어갈 때 어둡게 넘긴다. 그냥 바꿔치우면 다른 모드가
+            // 미처 준비되지 않은 화면을 훑게 될 수 있다.
+            CCDirector::sharedDirector()->replaceScene(
+                CCTransitionFade::create(0.5f, scene)
+            );
+        });
     }
 
     void dropWorkspace() {
