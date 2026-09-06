@@ -260,8 +260,12 @@ void CoopPopup::tick(float) {
 
     // 방을 만들려면 올릴 레벨이 열려 있어야 한다. 레벨 목록에서 연 창에서는
     // 올릴 것이 없으니 들어가기만 된다.
+    //
+    // 그렇다고 버튼을 꺼두지는 않는다. 꺼진 버튼은 "고장 났다"로 읽힌다.
+    // 눌리게 두고, 왜 안 되는지와 어떻게 하면 되는지를 알려준다.
+    // 잠긴 문에 "왜 잠겼는지"와 "열쇠는 어디 있는지"를 붙여두는 것과 같다.
     if (m_createButton) {
-        m_createButton->setEnabled(coop::canHost());
+        m_createButton->setEnabled(true);
     }
 
     if (m_statusLabel) {
@@ -295,9 +299,11 @@ void CoopPopup::tick(float) {
 
 void CoopPopup::onCreate(CCMenuItemSpriteExtra*) {
     if (!coop::canHost()) {
+        // 방을 만든다는 것은 "내 레벨을 이 방에 올린다"는 뜻이다.
+        // 레벨 목록에서는 올릴 레벨이 정해지지 않아서 만들 수가 없다.
         Notification::create(
-            "Open a level in the editor first, then Create Room",
-            NotificationIcon::Warning, 5.f
+            "To host: open your level, tap EDIT, then COOP - Create Room",
+            NotificationIcon::Warning, 7.f
         )->show();
         return;
     }
