@@ -145,6 +145,53 @@ namespace {
         return object && g_present.contains(object);
     }
 
+    // 텔레포트 포탈은 짝을 생 포인터(m_orangePortal) 하나로 들고 있다.
+    //
+    // 한쪽을 지우면 남은 쪽은 사라진 자리를 계속 가리킨다. 게임은 매 프레임
+    // 포탈 위치를 맞추면서 그 포인터를 따라가므로, 다음 프레임에 죽는다.
+    // 지우기 전에 서로 손을 놓게 한다.
+    //
+    // 손잡고 걷다가 한 사람만 사라지면, 남은 사람은 빈 손을 계속 잡고 있는
+    // 셈이다. 사라지기 전에 손을 놓아야 한다.
+    void unlinkPortal(GameObject* object) {
+        auto portal = typeinfo_cast<TeleportPortalObject*>(object);
+        if (!portal) return;
+
+        if (auto other = portal->m_orangePortal) {
+            // 이미 못 쓰는 포인터일 수 있다. 레벨에 살아 있는 것만 건드린다.
+            // 목록 확인은 주소만 견주므로 죽은 포인터라도 안전하다.
+            if (g_present.contains(static_cast<GameObject*>(other))
+                && other->m_orangePortal == portal) {
+                other->m_orangePortal = nullptr;
+            }
+        }
+        portal->m_orangePortal = nullptr;
+    }
+
+    // 방에서 받은 것을 다 만든 뒤 한 번 훑는다.
+    //
+    // 큰 레벨은 나눠서 만들기 때문에 짝이 다른 묶음에 들어갈 수 있다. 만드는
+    // 시점에 상대가 아직 없으면, 남는 포인터가 어디를 가리킬지 알 수 없다.
+    // 레벨에 없는 것을 가리키고 있으면 그냥 끊는다. 포탈이 안 이어지는 것은
+    // 고칠 수 있지만, 죽은 자리를 짚는 것은 못 고친다.
+    void unlinkStrayPortals(LevelEditorLayer* editor) {
+        if (!editor || !editor->m_objects) return;
+        refreshPresent(editor);
+
+        auto total = editor->m_objects->count();
+        for (unsigned int i = 0; i < total; ++i) {
+            auto portal = typeinfo_cast<TeleportPortalObject*>(
+                static_cast<GameObject*>(editor->m_objects->objectAtIndex(i))
+            );
+            if (!portal) continue;
+
+            if (auto other = portal->m_orangePortal;
+                other && !g_present.contains(static_cast<GameObject*>(other))) {
+                portal->m_orangePortal = nullptr;
+            }
+        }
+    }
+
     void forget(std::string const& uid) {
         if (auto it = g_objectByUid.find(uid); it != g_objectByUid.end()) {
             if (auto object = it->second.data()) {
@@ -252,6 +299,7 @@ namespace {
 
             forget(uid);
             if (isInLevel(object)) {
+                unlinkPortal(object);
                 editor->removeObject(object, true);
             }
         }
@@ -272,6 +320,7 @@ namespace {
         Ref<GameObject> object = it->second;
         forget(uid);
         if (isInLevel(object)) {
+            unlinkPortal(object);
             editor->removeObject(object, true);
         }
     }
@@ -382,6 +431,10 @@ namespace {
         }
 
         g_incoming.erase(g_incoming.begin(), g_incoming.begin() + count);
+
+        // 다 받아 만들었으면 짝 잃은 포탈을 정리한다. 나눠 만드는 동안에는
+        // 아직 안 온 짝을 끊어버릴 수 있으므로 끝난 뒤에만 한다.
+        if (g_incoming.empty()) unlinkStrayPortals(editor);
     }
 
     // 사라진 오브젝트를 찾아 상대에게 알린다.
@@ -473,6 +526,9 @@ namespace coop {
         // 우리가 지우는 것이므로 이 삭제를 다시 방에 알리면 안 된다.
         RemoteScope scope;
 
+        // 아래에서 "아직 레벨에 있는지"로 판단하므로 목록을 먼저 맞춘다.
+        refreshPresent(editor);
+
         // 지우는 동안 목록 자체가 줄어들기 때문에 먼저 따로 옮겨 담는다.
         std::vector<Ref<GameObject>> all;
         all.reserve(editor->m_objects->count());
@@ -480,8 +536,17 @@ namespace coop {
             all.push_back(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
         }
 
+        // 포탈끼리 서로를 가리키고 있다. 하나씩 지우다 보면 남은 쪽이 이미
+        // 사라진 자리를 가리키게 되므로, 지우기 전에 전부 손을 놓게 한다.
         for (auto& held : all) {
-            if (auto object = held.data(); object && object->getParent()) {
+            unlinkPortal(held.data());
+        }
+
+        for (auto& held : all) {
+            // 화면 밖으로 나간 오브젝트는 게임이 화면에서 떼어놓는다.
+            // 그래서 "붙어 있는지"로 판단하면 안 보이는 것들만 안 지워지고
+            // 남아서, 방의 레벨에 내 옛 레벨 조각이 섞인다.
+            if (auto object = held.data(); object && isInLevel(object)) {
                 editor->removeObject(object, true);
             }
         }
