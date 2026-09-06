@@ -830,6 +830,9 @@ namespace coop {
         // 올리면 방장의 색이 흰 도화지로 덮인다. 그 전까지만 막는다.
         if (!g_hosting && !roomSettingsApplied()) return;
 
+        auto text = levelSettingsString();
+        if (text.empty() || text == g_lastSettings) return;
+
         // 사람이 실제로 바꿨을 때만 보낸다.
         //
         // 그 신호는 게임이 설정 창을 닫을 때 준다. 그런데 색 창은 그 신호를
@@ -846,8 +849,6 @@ namespace coop {
             return;
         }
 
-        auto text = levelSettingsString();
-        if (text.empty() || text == g_lastSettings) return;
         g_lastSettings = text;
 
         g_settingsDirty = false;
