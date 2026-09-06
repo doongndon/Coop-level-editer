@@ -464,6 +464,18 @@ class $modify(CoopEditorUI, EditorUI) {
         this->tellWhereIAm(touch);
     }
 
+    // 사람이 오브젝트를 옮겼다. 게임이 직접 알려주는 순간이다.
+    void moveObject(GameObject* object, cocos2d::CCPoint offset) {
+        EditorUI::moveObject(object, offset);
+        coop::noticeLocalEdit(object);
+    }
+
+    // 돌리기, 크기, 뒤집기 같은 것도 마찬가지다.
+    void transformObject(GameObject* object, EditCommand command, bool snap) {
+        EditorUI::transformObject(object, command, snap);
+        coop::noticeLocalEdit(object);
+    }
+
     GameObject* createObject(int objectID, CCPoint position) {
         auto object = EditorUI::createObject(objectID, position);
         coop::noticeObject(object);

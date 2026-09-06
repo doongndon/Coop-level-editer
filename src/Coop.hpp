@@ -96,6 +96,10 @@ namespace coop {
     // 선택 중인 오브젝트만 빠르게 검사한다. 편집 반응을 즉각적으로 만들기 위한 것.
     void syncSelection(cocos2d::CCArray* selected);
 
+    // 사람이 이 오브젝트를 직접 움직이거나 바꿨다. 되먹임을 막으려고 걸어둔
+    // "잠깐 조용히"를 걷어, 이 편집만은 반드시 상대에게 전해지게 한다.
+    void noticeLocalEdit(GameObject* object);
+
     // 방금 만들어진 오브젝트를 즉시 알린다. 큰 레벨에서 주기 검사가 여기까지
     // 돌아오기를 기다리지 않도록 하기 위한 지름길.
     void noticeObject(GameObject* object);

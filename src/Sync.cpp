@@ -918,6 +918,22 @@ namespace coop {
         }
     }
 
+    // 사람이 이 오브젝트를 직접 건드렸다.
+    //
+    // 조용히 하기(hush)는 되먹임을 막으려고 둔 것이지, 사람의 편집까지 막으려는
+    // 것이 아니다. 상대 것을 받은 직후 2초 안에 내가 그것을 움직이면, 그 편집은
+    // 반드시 전해져야 한다. 게임이 "옮겼다"고 알려줄 때 조용히 하기를 걷는다.
+    //
+    // 값을 견주어 짐작하는 대신 게임에게 직접 듣는 것이라, 사람이 한 일과
+    // 게임이 다시 계산한 것이 섞이지 않는다.
+    void noticeLocalEdit(GameObject* object) {
+        if (g_applyingRemote || !g_active || !object) return;
+
+        auto known = g_uidByLocalId.find(object->m_uniqueID);
+        if (known == g_uidByLocalId.end()) return;
+        g_quiet.erase(known->second);
+    }
+
     void noticeObject(GameObject* object) {
         if (g_applyingRemote || !g_active || !object) return;
         // 여기서 바로 읽지 않는다. 위 g_pending 설명 참고.

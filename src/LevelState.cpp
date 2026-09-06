@@ -80,55 +80,23 @@ namespace {
         auto manager = editor->m_effectManager;
         if (!manager || blob.empty()) return;
 
-        int applied = 0;
+        // 게임이 레벨을 열 때 색을 읽어들이는 바로 그 함수에 통째로 넘긴다.
+        //
+        // 예전에는 색 통로를 하나씩 찾아 손으로 고쳐 넣었다. 숫자는 바뀌는데
+        // 화면은 그대로였다. 게임이 실제로 보는 자리가 따로 있었던 것이다.
+        // 통로마다 딸린 것들(스프라이트, 섞임 설정, 복사 관계)까지 맞춰야
+        // 하는데 그건 이 함수만 안다.
+        //
+        // 레시피를 따라 재료를 하나씩 바꿔 넣는 대신, 주방장에게 완성된
+        // 주문서를 그대로 건네는 셈이다.
+        manager->setupFromString(blob);
 
-        size_t start = 0;
-        while (start <= blob.size()) {
-            auto bar = blob.find('|', start);
-            auto entry = blob.substr(start, bar == std::string::npos ? std::string::npos : bar - start);
-
-            if (!entry.empty()) {
-                // 통로 번호를 찾으려면 _ 로 나눠서 키 6의 값을 봐야 한다.
-                int channel = 0;
-                size_t at = 0;
-                std::string key;
-                bool expectingKey = true;
-                while (at <= entry.size()) {
-                    auto under = entry.find('_', at);
-                    auto piece = entry.substr(at, under == std::string::npos ? std::string::npos : under - at);
-                    if (expectingKey) {
-                        key = std::move(piece);
-                    } else if (key == "6") {
-                        channel = std::atoi(piece.c_str());
-                        break;
-                    }
-                    expectingKey = !expectingKey;
-                    if (under == std::string::npos) break;
-                    at = under + 1;
-                }
-
-                if (channel != 0) {
-                    // 이미 있는 통로는 그 자리에서 고친다. 새로 만들어 갈아끼우면
-                    // 누가 그 통로를 들고 있는지 알 수 없어 위험하다.
-                    if (auto action = manager->getColorAction(channel)) {
-                        action->setupFromString(entry);
-                        ++applied;
-                    }
-                    // 상대가 쓰는 통로를 내 레벨이 아직 안 갖고 있을 수 있다.
-                    // 그 경우 없다고 넘기면 그 색만 영영 안 맞는다. 만들어 넣는다.
-                    else if (auto fresh = ColorAction::create()) {
-                        fresh->setupFromString(entry);
-                        manager->setColorAction(fresh, channel);
-                        ++applied;
-                    }
-                }
-            }
-
-            if (bar == std::string::npos) break;
-            start = bar + 1;
+        // 몇 개의 통로가 왔는지. 화면에 띄워 어디가 끊겼는지 보려고 센다.
+        int seen = 0;
+        for (std::size_t at = 0; at < blob.size(); ++at) {
+            if (blob[at] == '|') ++seen;
         }
-
-        g_colorsApplied = applied;
+        g_colorsApplied = seen;
 
         manager->calculateBaseActiveColors();
         if (editor->m_objects) {
