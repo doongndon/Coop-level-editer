@@ -441,6 +441,7 @@ namespace coop {
 
         // 여기까지 왔으면 방의 설정을 실제로 반영한 것이다.
         g_haveRoomSettings = true;
+        hushSettings();
 
         auto incomingColors = stringOf(values, COLOR_KEY);
         g_colorCharsIn = static_cast<int>(incomingColors.size());

@@ -78,7 +78,16 @@ namespace {
         return found != g_quiet.end() && found->second > 0;
     }
 
+    // 설정(배경, 바닥, 색깔)도 같은 말다툼에 빠진다.
+    //
+    // 색을 반영하면 게임이 값을 자기 방식대로 다시 계산한다. 그러면 방금 받은
+    // 내용과 내 레벨의 실제 내용이 미세하게 달라지고, 우리는 그걸 "내가 바꿨다"로
+    // 읽어 도로 보낸다. 상대도 똑같이 한다. 색이 계속 서로 덮인다.
+    unsigned int g_settingsQuiet = 0;
+
     void tickQuiet() {
+        if (g_settingsQuiet > 0) --g_settingsQuiet;
+
         for (auto it = g_quiet.begin(); it != g_quiet.end();) {
             if (it->second <= 1) it = g_quiet.erase(it);
             else { --it->second; ++it; }
@@ -679,8 +688,20 @@ namespace coop {
         send(std::move(msg));
     }
 
+    void hushSettings() {
+        g_settingsQuiet = QUIET_TICKS;
+    }
+
     void syncLevelSettings() {
         if (!inRoom() || g_applyingRemote) return;
+
+        // 방금 상대 설정을 반영했으면 잠깐 아무 말도 하지 않는다.
+        // 지금 보이는 차이는 내가 바꾼 것이 아니라, 게임이 값을 다시 계산해서
+        // 생긴 것일 뿐이다. 그걸 보내면 색이 서로 덮이며 끝나지 않는다.
+        if (g_settingsQuiet > 0) {
+            g_lastSettings = levelSettingsString();
+            return;
+        }
 
         // 손님은 방의 설정을 받기 전까지 자기 것을 올리지 않는다.
         //

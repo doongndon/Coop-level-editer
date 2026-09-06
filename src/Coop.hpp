@@ -143,6 +143,10 @@ namespace coop {
     void tickSongDownload();
     // 설정이 달라졌으면 방에 알린다. 주기적으로 부른다.
     void syncLevelSettings();
+    // 방금 상대 설정을 반영했다. 잠깐 내 설정을 올리지 않는다.
+    // 반영 직후에는 게임이 값을 다시 계산해서 내용이 미세하게 달라지는데,
+    // 그걸 "내가 바꿨다"로 보내면 색이 서로 덮이며 끝나지 않는다.
+    void hushSettings();
     // 방이나 레벨이 바뀌었다. 다음 설정은 같은 내용이라도 화면에 다시 반영한다.
     void forgetAppliedSettings();
     // 방의 설정을 한 번이라도 받아 반영했는지. 손님이 자기 빈 레벨의 설정으로
