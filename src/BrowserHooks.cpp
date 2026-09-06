@@ -55,9 +55,10 @@ class $modify(CoopLevelBrowser, LevelBrowserLayer) {
         if (spot == "bottom-left") return { left, 26.f };
         if (spot == "bottom-right") return { right, 26.f };
         if (spot == "left-middle") return { left, size.height * 0.45f };
+        if (spot == "right-middle") return { right, size.height * 0.45f };
 
-        // 기본값. 오른쪽 줄 가운데가 이 화면에서 유일하게 비어 있는 자리다.
-        // 왼쪽 가운데에 뒀더니 GD 버튼 하나를 덮었다.
-        return { right, size.height * 0.45f };
+        // 기본값. 왼쪽 위 돋보기와 왼쪽 아래 파일 버튼 사이가 통째로 비어 있다.
+        // 목록 창보다 왼쪽이라 목록을 가리지도 않는다.
+        return { size.width * 0.148f, size.height * 0.636f };
     }
 };

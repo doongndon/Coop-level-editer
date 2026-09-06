@@ -30,10 +30,10 @@ namespace {
     // 일부러 왼쪽을 고른 사람이 다시 골라도 두 번 옮기지는 않는다.
     void moveBrowserButtonOnce() {
         auto mod = Mod::get();
-        if (mod->getSavedValue<bool>("browser-spot-moved", false)) return;
-        mod->setSavedValue<bool>("browser-spot-moved", true);
-
-        if (mod->getSettingValue<std::string>("browser-spot") != "left-middle") return;
+        // 자리를 옮길 때마다 이 번호를 올린다. 저장된 값이 기본값을 이기기
+        // 때문에, 새 자리를 정해도 한 번 되돌려주지 않으면 아무도 못 본다.
+        if (mod->getSavedValue<int>("browser-spot-gen", 0) >= 3) return;
+        mod->setSavedValue<int>("browser-spot-gen", 3);
         if (auto setting = mod->getSetting("browser-spot")) setting->reset();
     }
 }
