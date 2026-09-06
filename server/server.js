@@ -25,6 +25,24 @@ const MAX_ROOMS = 200;
 // 방에 보관할 채팅 줄 수. 나중에 들어온 사람이 흐름을 따라올 정도만.
 const CHAT_KEEP = 20;
 const MAX_ROOM_NAME = 32;
+// 오브젝트 하나가 차지할 수 있는 글자 수와, 방 하나에 담을 수 있는 개수.
+//
+// 여러 사람에게 열어두는 서버라 한 사람이 실수하거나 장난치는 것만으로
+// 서버가 메모리를 다 쓰고 죽을 수 있다. 정상적인 오브젝트는 길어야 몇백
+// 글자이고, 아주 큰 레벨도 수십만 개를 넘지 않는다. 넉넉히 잡아두고 그
+// 위는 받지 않는다.
+const MAX_OBJECT_DATA = 4000;
+const MAX_OBJECTS_PER_ROOM = 300000;
+// 레벨 설정(배경, 바닥, 색깔) 한 덩어리의 길이.
+const MAX_SETTINGS_DATA = 200000;
+
+// 이 오브젝트를 방에 담아도 되는지.
+// 이미 있는 것을 고치는 것은 개수가 늘지 않으므로 언제나 허용한다.
+function canStore(room, uid, data) {
+    if (data.length > MAX_OBJECT_DATA) return false;
+    if (room.objects.has(uid)) return true;
+    return room.objects.size < MAX_OBJECTS_PER_ROOM;
+}
 // 비어 있는 방을 얼마나 붙들고 있을지. 잠깐 게임을 껐다 켜는 정도는 버텨야 한다.
 const EMPTY_ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
@@ -188,7 +206,7 @@ setInterval(sweepRooms, SWEEP_INTERVAL_MS).unref?.();
 
 // 브라우저로 주소를 열었을 때 보이는 화면.
 // 배포가 실제로 갱신됐는지 눈으로 확인할 수 있도록 버전을 같이 찍는다.
-const SERVER_VERSION = "v11 (resync sends settings)";
+const SERVER_VERSION = "v12 (size limits)";
 
 const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
@@ -382,6 +400,7 @@ wss.on("connection", client => {
             // 레벨 설정은 하나뿐이라 덮어쓰고 그대로 전달한다.
             case "settings":
                 if (typeof msg.data !== "string" || msg.data === "") return;
+                if (msg.data.length > MAX_SETTINGS_DATA) return;
                 room.settings = {
                     type: "settings",
                     data: msg.data,
@@ -396,6 +415,7 @@ wss.on("connection", client => {
             case "add":
             case "update":
                 if (typeof msg.uid !== "string" || typeof msg.data !== "string") return;
+                if (!canStore(room, msg.uid, msg.data)) return;
                 room.objects.set(msg.uid, msg.data);
                 relay(room, client, { type: msg.type, uid: msg.uid, data: msg.data });
                 return;
@@ -407,6 +427,7 @@ wss.on("connection", client => {
                 const good = [];
                 for (const item of msg.items) {
                     if (!item || typeof item.uid !== "string" || typeof item.data !== "string") continue;
+                    if (!canStore(room, item.uid, item.data)) continue;
                     room.objects.set(item.uid, item.data);
                     good.push({ uid: item.uid, data: item.data });
                 }

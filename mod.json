@@ -4,11 +4,19 @@
         "win": "2.2081",
         "android": "2.2081"
     },
-    "version": "v0.39.1",
-    "id": "com.yourname.coopedit",
+    "id": "doongndon.coopedit",
     "name": "Coop Level Editor",
-    "developer": "yourname",
-    "description": "Edit levels together in real time",
+    "version": "v0.40.0",
+    "developer": "0octagon0",
+    "description": "Build one level together, live, with a friend",
+    "tags": [
+        "editor",
+        "online",
+        "utility"
+    ],
+    "links": {
+        "source": "https://github.com/doongndon/Coop-level-editer"
+    },
     "settings": {
         "server-url": {
             "name": "Server Address",
