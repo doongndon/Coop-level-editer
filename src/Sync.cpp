@@ -338,6 +338,18 @@ namespace {
             }
 
             forget(uid);
+
+            // 옛것을 못 지운 채로 새것을 만들면 물건이 두 배가 된다.
+            //
+            // "레벨에 있는지"는 따로 들고 있는 목록으로 판단하는데, 그 목록이
+            // 잠깐 어긋날 수 있다. 어긋난 김에 "이미 없네" 하고 넘어가면
+            // 옛것은 그대로 남고 새것이 하나 더 생긴다. 그게 쌓이면 양쪽
+            // 오브젝트 수가 벌어진다.
+            //
+            // 그래서 없다고 나오면 진짜 목록을 한 번 더 확인한다. 어긋나는
+            // 경우에만 다시 읽으므로 평소에는 값이 들지 않는다.
+            if (!isInLevel(object)) refreshPresent(editor);
+
             if (isInLevel(object)) {
                 letGoOf(editor, object);
                 editor->removeObject(object, true);
