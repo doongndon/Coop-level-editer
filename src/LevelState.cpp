@@ -76,8 +76,34 @@ namespace {
     int g_colorCharsOut = 0;
     int g_colorCharsIn = 0;
 
+    // 색을 읽고 쓸 곳.
+    //
+    // 색은 두 군데에서 가리킬 수 있다. 에디터가 들고 있는 것과, 레벨 설정이
+    // 들고 있는 것. 보통은 같은 하나지만 반드시 그렇다는 보장이 없다.
+    //
+    // 우리는 색을 읽을 때 레벨 설정의 저장 문자열(kS38)에서 읽는다. 그건 레벨
+    // 설정이 들고 있는 쪽에서 나온다. 그런데 쓸 때는 에디터가 들고 있는 쪽에
+    // 썼다. 둘이 다르면, 쓴 것은 화면에 안 나오고 읽은 것은 안 바뀐다.
+    //
+    // 편지를 한 주소로 받아놓고 답장은 다른 주소로 부치는 셈이다.
+    // 읽는 곳과 쓰는 곳을 하나로 맞춘다.
+    GJEffectManager* effectsOf(LevelEditorLayer* editor) {
+        if (!editor) return nullptr;
+        if (editor->m_levelSettings && editor->m_levelSettings->m_effectManager) {
+            return editor->m_levelSettings->m_effectManager;
+        }
+        return editor->m_effectManager;
+    }
+
+    // 두 곳이 서로 다른지. 다르면 진단 줄에 표시해서 바로 알아채게 한다.
+    bool effectsSplit(LevelEditorLayer* editor) {
+        return editor && editor->m_levelSettings
+            && editor->m_levelSettings->m_effectManager
+            && editor->m_levelSettings->m_effectManager != editor->m_effectManager;
+    }
+
     void applyColors(LevelEditorLayer* editor, std::string const& blob) {
-        auto manager = editor->m_effectManager;
+        auto manager = effectsOf(editor);
         if (!manager || blob.empty()) return;
 
         // 게임이 레벨을 열 때 색을 읽어들이는 바로 그 함수에 통째로 넘긴다.
@@ -255,11 +281,14 @@ namespace coop {
             return fmt::format("obj {}  loading {} more...", objects, waiting);
         }
 
+        // 색을 읽는 곳과 쓰는 곳이 갈라져 있으면 그것부터 알아야 한다.
+        auto split = effectsSplit(editor) ? "  !fx" : "";
+
         return fmt::format(
-            "obj {}/{}  cur {}/{}  col {}/{}  ok {}",
+            "obj {}/{}  cur {}/{}  col {}/{}  ok {}{}",
             objects, trackedCount(),
             cursorsSent(), cursorsReceived(),
-            g_colorCharsOut, g_colorCharsIn, g_colorsApplied
+            g_colorCharsOut, g_colorCharsIn, g_colorsApplied, split
         );
     }
 
