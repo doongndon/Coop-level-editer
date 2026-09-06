@@ -609,6 +609,16 @@ namespace coop {
     }
 
     // 방을 만들려면 올릴 레벨이 열려 있어야 한다.
+    // 우리가 uid를 붙여 아는 오브젝트 수.
+    //
+    // 레벨에 있는 수와 이 수가 다르면 "짝을 못 지은 오브젝트"가 있다는 뜻이다.
+    // 그런 것은 다음 검사에서 "처음 보는 물건"으로 보여 방에 새로 올라가고,
+    // 그러면 같은 물건이 두 개가 된다. 양쪽 오브젝트 수가 벌어지는 원인을
+    // 가리려면 이 수가 필요하다.
+    int trackedCount() {
+        return static_cast<int>(g_objectByUid.size());
+    }
+
     bool canHost() {
         return LevelEditorLayer::get() != nullptr;
     }

@@ -286,8 +286,8 @@ namespace coop {
         }
 
         return fmt::format(
-            "obj {}  cur {}/{}  col {}/{}  ok {}",
-            objects,
+            "obj {}/{}  cur {}/{}  col {}/{}  ok {}",
+            objects, trackedCount(),
             cursorsSent(), cursorsReceived(),
             g_colorCharsOut, g_colorCharsIn, g_colorsApplied
         );
