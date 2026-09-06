@@ -58,6 +58,24 @@ namespace coop {
         return Mod::get()->getVersion().toVString();
     }
 
+    // 실제로 도는 코드가 어느 판인지. 빌드할 때 새겨 넣은 값이다.
+    std::string builtVersion() {
+#ifdef COOP_BUILT_VERSION
+        return COOP_BUILT_VERSION;
+#else
+        return "?";
+#endif
+    }
+
+    // 파일과 도는 코드가 어긋났는지.
+    //
+    // 이 경우 무엇을 고쳐도 반영되지 않는데 화면에는 새 버전이 떠서
+    // 원인을 찾는 데 오래 걸린다. 눈에 띄게 알려야 한다.
+    bool binaryIsStale() {
+        auto built = builtVersion();
+        return built != "?" && built != modVersion();
+    }
+
     void updateMod() {
         // 두 번 눌러 같은 파일을 동시에 두 번 쓰면 반쯤 쓰인 파일이 남는다.
         if (g_busy.exchange(true)) return;
@@ -115,6 +133,24 @@ namespace coop {
                 std::filesystem::remove(temporary, ignored);
                 finish(false, fmt::format("Could not replace the mod ({})", ec.message()));
                 return;
+            }
+
+            // .geode만 바꾸면 모자란다.
+            //
+            // Geode는 mod.json은 파일에서 새로 읽지만, 실행할 코드는 예전에
+            // 풀어둔 것을 그대로 다시 쓴다. 그래서 버전 표시만 새것이 되고
+            // 동작은 옛것으로 남는다. 풀어둔 것을 치워야 다음에 켤 때 새로 푼다.
+            std::error_code binEc;
+            auto binary = Mod::get()->getBinaryPath();
+            if (!std::filesystem::remove(binary, binEc)) {
+                // 윈도우는 지금 실행 중인 파일을 지우지 못한다.
+                // 이름만 바꿔놔도 Geode가 없는 것으로 보고 새로 푼다.
+                std::error_code renameEc;
+                std::filesystem::rename(binary, binary.string() + ".old", renameEc);
+                if (renameEc) {
+                    finish(false, "Downloaded, but could not clear the old binary");
+                    return;
+                }
             }
 
             finish(true, "Updated! Restart GD to use it");

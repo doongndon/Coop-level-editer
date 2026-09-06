@@ -203,6 +203,10 @@ namespace coop {
     void updateMod();
     bool isUpdating();
     std::string modVersion();
+    // 빌드할 때 바이너리에 새겨 넣은 버전.
+    std::string builtVersion();
+    // 파일(mod.json)과 실제로 도는 코드가 어긋났는지.
+    bool binaryIsStale();
 
     // --- 인증서 (빌드할 때 생성되는 CaBundle.cpp) ---
 

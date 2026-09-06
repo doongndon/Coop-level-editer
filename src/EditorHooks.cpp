@@ -3,6 +3,8 @@
 
 #include <Geode/modify/EditorUI.hpp>
 
+#include <Geode/ui/Notification.hpp>
+
 #include <functional>
 
 using namespace geode::prelude;
@@ -123,6 +125,18 @@ class $modify(CoopEditorUI, EditorUI) {
         m_fields->m_menu = menu;
 
         coop::clearCursors();
+
+        // 파일만 새것이고 도는 코드가 옛것이면, 무엇을 고쳐도 반영되지 않는다.
+        // 조용히 두면 원인을 찾는 데 며칠이 걸린다.
+        if (coop::binaryIsStale()) {
+            Notification::create(
+                fmt::format(
+                    "Coop is running old code ({}). Reinstall the mod file.",
+                    coop::builtVersion()
+                ),
+                NotificationIcon::Error, 8.f
+            )->show();
+        }
 
         if (coop::consumeWorkspaceEntry()) {
             // 방에 들어가느라 우리가 직접 연 에디터다. 아래 규칙을 적용하면

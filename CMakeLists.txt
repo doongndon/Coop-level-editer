@@ -31,6 +31,17 @@ list(APPEND SOURCES ${CMAKE_BINARY_DIR}/generated/CaBundle.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
+# mod.json의 버전을 바이너리 안에 새겨 넣는다.
+#
+# .geode 파일만 바뀌고 실제로 도는 코드는 옛것으로 남는 일이 있었다.
+# Geode가 이미 풀어둔 바이너리를 다시 쓰기 때문이다. 그러면 화면에는
+# 새 버전이 뜨는데 동작은 옛것이라 무엇을 고쳐도 반영되지 않는다.
+# 새겨둔 값과 mod.json의 값을 견주면 그 상태를 바로 알아챌 수 있다.
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/mod.json COOP_MOD_JSON)
+string(JSON COOP_MOD_VERSION GET ${COOP_MOD_JSON} version)
+target_compile_definitions(${PROJECT_NAME} PRIVATE COOP_BUILT_VERSION="${COOP_MOD_VERSION}")
+message(STATUS "Coop: 바이너리에 새길 버전 = ${COOP_MOD_VERSION}")
+
 if (MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
 endif()

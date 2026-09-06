@@ -214,10 +214,21 @@ void CoopPopup::tick(float) {
 
     if (m_versionLabel) {
         auto server = coop::serverVersion();
-        // modVersion()이 이미 앞에 v를 붙여 준다. 여기서 또 붙이면 "vv0.9.0".
-        m_versionLabel->setString(fmt::format(
-            "mod {} / server {}", coop::modVersion(), server.empty() ? "?" : server
-        ).c_str());
+
+        // 파일과 도는 코드가 어긋났으면 그것부터 알려야 한다.
+        // 이 상태에서는 무엇을 고쳐도 반영되지 않는다.
+        if (coop::binaryIsStale()) {
+            m_versionLabel->setString(fmt::format(
+                "OLD CODE RUNNING ({}) - reinstall the mod", coop::builtVersion()
+            ).c_str());
+            m_versionLabel->setColor({ 255, 90, 90 });
+        } else {
+            // modVersion()이 이미 앞에 v를 붙여 준다. 여기서 또 붙이면 "vv0.9.0".
+            m_versionLabel->setString(fmt::format(
+                "mod {} / server {}", coop::modVersion(), server.empty() ? "?" : server
+            ).c_str());
+            m_versionLabel->setColor({ 170, 170, 170 });
+        }
     }
 
     if (m_myStatsLabel) {
