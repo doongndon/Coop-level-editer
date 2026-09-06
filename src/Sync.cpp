@@ -52,6 +52,38 @@ namespace {
 
     // 이 방의 원본을 내가 들고 있는지. 방장이면 참.
     bool g_hosting = false;
+
+    // 방금 상대 것을 반영한 오브젝트들. 잠깐 조용히 둔다.
+    //
+    // 양쪽이 같은 오브젝트를 두고 서로 다른 답을 우기면 끝나지 않는다.
+    // A가 보낸 것을 B가 반영하고, B가 자기 것을 도로 보내고, A가 다시
+    // 되돌리고... 화면에서는 물체가 계속 튀고 색깔이 뒤집힌다.
+    //
+    // 왜 어긋나는지는 경우마다 다르다(게임이 저장 글자를 다듬거나, 두 사람이
+    // 거의 같은 순간에 만졌거나). 그래서 원인마다 막는 대신, 방금 상대 것을
+    // 받은 오브젝트는 잠깐 내 쪽에서 아무 말도 하지 않게 한다.
+    //
+    // 말다툼에서 한쪽이 잠깐 입을 다물면 그걸로 끝난다. 둘 다 계속 말하면
+    // 영원히 안 끝난다.
+    std::unordered_map<std::string, unsigned int> g_quiet;
+    // 0.25초짜리 검사 8번 = 2초.
+    constexpr unsigned int QUIET_TICKS = 8;
+
+    void hushObject(std::string const& uid) {
+        g_quiet[uid] = QUIET_TICKS;
+    }
+
+    bool isHushed(std::string const& uid) {
+        auto found = g_quiet.find(uid);
+        return found != g_quiet.end() && found->second > 0;
+    }
+
+    void tickQuiet() {
+        for (auto it = g_quiet.begin(); it != g_quiet.end();) {
+            if (it->second <= 1) it = g_quiet.erase(it);
+            else { --it->second; ++it; }
+        }
+    }
     // 서버가 알려준 "아직 더 올 개수". 진행 상황 표시에만 쓴다.
     int g_stillComing = 0;
     constexpr std::size_t APPLY_BATCH = 400;
@@ -334,6 +366,7 @@ namespace {
 
                 // 넣으려던 값이 아니라 게임이 실제로 갖게 된 값을 적어둔다.
                 g_lastSaved[uid] = saveStringOf(object, editor);
+                hushObject(uid);
                 return;
             }
 
@@ -362,9 +395,12 @@ namespace {
             return;
         }
         remember(uid, object, editor);
+        hushObject(uid);
     }
 
     void applyRemove(LevelEditorLayer* editor, std::string const& uid) {
+        g_quiet.erase(uid);
+
         auto it = g_objectByUid.find(uid);
         if (it == g_objectByUid.end()) return;
 
@@ -406,6 +442,15 @@ namespace {
     void sendIfChanged(LevelEditorLayer* editor, std::string const& uid, GameObject* object) {
         auto data = saveStringOf(object, editor);
         if (g_lastSaved[uid] == data) return;
+
+        // 방금 상대 것을 받은 오브젝트는 잠깐 내버려둔다. 지금 보이는 차이는
+        // 내가 고쳐서 생긴 것이 아니라, 받은 내용과 게임이 실제로 만든 모습이
+        // 조금 다른 것일 뿐일 때가 많다. 그걸 "내가 고쳤다"고 보내면 상대가
+        // 되돌리고, 나도 되돌리고, 끝나지 않는다.
+        if (isHushed(uid)) {
+            g_lastSaved[uid] = data;
+            return;
+        }
 
         g_lastSaved[uid] = data;
 
@@ -469,6 +514,7 @@ namespace {
                     g_present.insert(object);
                     auto const& [uid, data] = g_incoming[fresh[k]];
                     remember(uid, object, editor);
+                    hushObject(uid);
                 }
             } else {
                 // 개수가 어긋나면 어느 것이 어느 uid인지 알 수 없다.
@@ -535,6 +581,7 @@ namespace coop {
         g_uidByLocalId.clear();
         g_objectByUid.clear();
         g_lastSaved.clear();
+        g_quiet.clear();
         g_pending.clear();
         g_scanIndex = 0;
         g_sweepTick = 0;
@@ -691,6 +738,8 @@ namespace coop {
         // 오브젝트를 옮기고 떼어내기 때문에, 그걸 편집으로 오해하면
         // 상대 레벨이 엉망이 된다.
         if (isPlaytesting(editor)) return;
+
+        tickQuiet();
 
         // 사라진 것을 먼저 확인한다. 삭제는 상대 화면에 남아 있으면
         // 그 위에 계속 덧그리게 되어 가장 헷갈리는 어긋남이 된다.
