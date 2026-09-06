@@ -221,10 +221,18 @@ namespace {
         g_lastSaved.erase(uid);
     }
 
-    void remember(std::string const& uid, GameObject* object, std::string saved) {
+    // 이 오브젝트를 uid와 짝지어 기억한다.
+    //
+    // "마지막으로 아는 모습"은 상대가 보낸 글자가 아니라 게임이 실제로 갖게 된
+    // 글자를 적어야 한다. 둘이 조금이라도 다르면, 다음 검사에서 "누가 고쳤네"로
+    // 보고 그 차이를 상대에게 도로 보낸다. 상대도 똑같이 하면 둘이 서로에게
+    // 계속 되돌려 보내며 물체가 왔다 갔다 한다.
+    void remember(
+        std::string const& uid, GameObject* object, LevelEditorLayer* editor
+    ) {
         g_uidByLocalId[object->m_uniqueID] = uid;
         g_objectByUid[uid] = object;
-        g_lastSaved[uid] = std::move(saved);
+        g_lastSaved[uid] = saveStringOf(object, editor);
     }
 
     // GD의 오브젝트 저장 문자열은 "키,값,키,값,..." 형태다.
@@ -310,9 +318,22 @@ namespace {
             if (isInLevel(object) && onlyPositionChanged(previous, data, moved)) {
                 // 옮기기만 한 경우. 통째로 다시 만들면 상대가 끄는 동안 깜빡이고
                 // 내가 그 오브젝트를 선택 중이었으면 선택이 풀린다.
+                // 겉보기 자리만 옮기면 모자란다.
+                //
+                // 오브젝트는 자기 자리를 m_startPosition에도 따로 들고 있고,
+                // 저장할 때 쓰는 값은 그쪽이다. setPosition만 부르면 화면에서는
+                // 옮겨졌는데 "기록상"으로는 제자리다. 그러면 다음 검사에서
+                // 옛 자리를 다시 상대에게 보내고, 상대는 그걸 받아 되돌리고,
+                // 서로 되돌려 보내며 물체가 그 거리만큼 계속 튄다.
+                //
+                // 이삿짐을 옮겨놓고 주소 변경 신고를 안 한 것과 같다.
+                // 우편은 계속 옛 집으로 간다.
                 object->setPosition(moved);
+                object->setStartPos(moved);
                 editor->updateObjectSection(object);
-                g_lastSaved[uid] = data;
+
+                // 넣으려던 값이 아니라 게임이 실제로 갖게 된 값을 적어둔다.
+                g_lastSaved[uid] = saveStringOf(object, editor);
                 return;
             }
 
@@ -328,7 +349,7 @@ namespace {
             log::warn("오브젝트를 만들지 못했습니다: {}", uid);
             return;
         }
-        remember(uid, object, data);
+        remember(uid, object, editor);
     }
 
     void applyRemove(LevelEditorLayer* editor, std::string const& uid) {
@@ -359,7 +380,7 @@ namespace {
     void trackAndSend(LevelEditorLayer* editor, GameObject* object) {
         auto uid = makeUid();
         auto data = saveStringOf(object, editor);
-        remember(uid, object, data);
+        remember(uid, object, editor);
 
         matjson::Value item;
         item["uid"] = uid;
@@ -435,7 +456,7 @@ namespace {
                     if (!object) continue;
                     g_present.insert(object);
                     auto const& [uid, data] = g_incoming[fresh[k]];
-                    remember(uid, object, data);
+                    remember(uid, object, editor);
                 }
             } else {
                 // 개수가 어긋나면 어느 것이 어느 uid인지 알 수 없다.
