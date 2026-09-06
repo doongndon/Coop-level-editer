@@ -48,7 +48,7 @@
         },
         "hud-spot": {
             "name": "Editor Bar Spot",
-            "description": "Where the COOP bar starts in the editor. You can also drag it anywhere by the small white handle on its left; changing this setting forgets where you dragged it.",
+            "description": "Where the COOP bar starts in the editor. You can also drag it anywhere by the small white handle on its left. Changing this setting forgets where you dragged it.",
             "type": "string",
             "default": "top-left",
             "one-of": [

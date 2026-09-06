@@ -37,8 +37,12 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES})
 # Geode가 이미 풀어둔 바이너리를 다시 쓰기 때문이다. 그러면 화면에는
 # 새 버전이 뜨는데 동작은 옛것이라 무엇을 고쳐도 반영되지 않는다.
 # 새겨둔 값과 mod.json의 값을 견주면 그 상태를 바로 알아챌 수 있다.
-file(READ ${CMAKE_CURRENT_SOURCE_DIR}/mod.json COOP_MOD_JSON)
-string(JSON COOP_MOD_VERSION GET ${COOP_MOD_JSON} version)
+#
+# 따옴표를 반드시 씌운다. CMake는 세미콜론을 목록 구분자로 보기 때문에,
+# mod.json 설명글에 세미콜론이 하나라도 들어가면 파일 내용이 여러 조각으로
+# 쪼개져서 "JSON이 깨졌다"며 빌드가 멈춘다.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/mod.json" COOP_MOD_JSON)
+string(JSON COOP_MOD_VERSION GET "${COOP_MOD_JSON}" version)
 target_compile_definitions(${PROJECT_NAME} PRIVATE COOP_BUILT_VERSION="${COOP_MOD_VERSION}")
 message(STATUS "Coop: 바이너리에 새길 버전 = ${COOP_MOD_VERSION}")
 
