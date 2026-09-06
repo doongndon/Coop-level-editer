@@ -109,7 +109,9 @@ class $modify(CoopEditorUI, EditorUI) {
 
         // 판을 먼저 넣어야 글자 뒤로 간다.
         auto plate = CCLayerColor::create({ 0, 0, 0, 130 }, 10.f, 18.f);
-        plate->setIgnoreAnchorPointForPosition(false);
+        // CCLayer 계열은 기본이 "기준점 무시"라서 가운데 정렬이 안 먹는다.
+        // 이름에 set이 없는 함수다.
+        plate->ignoreAnchorPointForPosition(false);
         plate->setAnchorPoint({ 0.5f, 0.5f });
         plate->setPosition(spot);
         plate->setZOrder(999);
