@@ -162,6 +162,7 @@ class $modify(CoopEditorUI, EditorUI) {
         // 이름에 set이 없는 함수다.
         plate->ignoreAnchorPointForPosition(false);
         plate->setAnchorPoint({ 0.5f, 0.5f });
+        plate->setPosition({ 0.f, 0.f });
         holder->addChild(plate);
         m_fields->m_plate = plate;
 
@@ -176,6 +177,10 @@ class $modify(CoopEditorUI, EditorUI) {
         m_fields->m_grip = grip;
 
         holder->addChild(menu);
+        // CCMenu는 만들어질 때 스스로 화면 한가운데로 간다. 그릇에 담기만 하고
+        // 자리를 안 잡아주면 그 버릇대로 그릇에서 화면 절반만큼 떨어진 곳에
+        // 가버려서, 판만 남고 글자는 화면 밖으로 나간다.
+        menu->setPosition({ 0.f, 0.f });
         m_fields->m_menu = menu;
 
         holder->setPosition(this->barSpot(0.f));
@@ -313,6 +318,8 @@ class $modify(CoopEditorUI, EditorUI) {
                 auto plateWidth = width + 16.f;
                 plate->setContentSize({ plateWidth, 18.f });
                 plate->setVisible(width > 0.f);
+
+                menu->setPosition({ 0.f, 0.f });
 
                 if (auto grip = m_fields->m_grip) {
                     // 손잡이는 판 왼쪽 바깥에 붙인다.

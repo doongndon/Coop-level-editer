@@ -4,7 +4,7 @@
         "win": "2.2081",
         "android": "2.2081"
     },
-    "version": "v0.20.0",
+    "version": "v0.20.1",
     "id": "com.yourname.coopedit",
     "name": "Coop Level Editor",
     "developer": "yourname",
