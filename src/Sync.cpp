@@ -85,6 +85,17 @@ namespace {
     // 읽어 도로 보낸다. 상대도 똑같이 한다. 색이 계속 서로 덮인다.
     unsigned int g_settingsQuiet = 0;
 
+    // 사용자가 실제로 설정을 바꿨는지.
+    //
+    // 예전에는 "설정 문자열이 달라졌으면 보낸다"였다. 그런데 상대 것을 반영하면
+    // 게임이 값을 자기 방식대로 다시 계산해서 내용이 미세하게 달라진다. 그것도
+    // "달라졌다"로 읽혀서 도로 보내고, 상대도 똑같이 하고, 끝나지 않았다.
+    //
+    // 이제는 게임이 "설정 창이 닫혔다"고 알려줄 때만 참이 된다. 그 신호는
+    // 사람이 실제로 무언가를 바꿨을 때만 온다. 값을 견주어 짐작하는 대신
+    // 게임에게 직접 물어보는 셈이다.
+    bool g_settingsDirty = false;
+
     void tickQuiet() {
         if (g_settingsQuiet > 0) --g_settingsQuiet;
 
@@ -656,6 +667,8 @@ namespace coop {
     // 이 방에서 내가 원본을 들고 있는 쪽인지.
     void uploadWholeLevel() {
         g_hosting = true;
+        // 방을 열 때는 내 레벨의 설정을 한 번 올려야 한다.
+        g_settingsDirty = true;
         // 대응표가 비어 있으면 다음 검사에서 레벨의 모든 오브젝트가
         // "처음 보는 것"이 되어 차례로 방에 올라간다.
         g_uidByLocalId.clear();
@@ -732,6 +745,15 @@ namespace coop {
         g_settingsQuiet = QUIET_TICKS;
     }
 
+    // 상대 것을 다 반영한 뒤에 부른다.
+    //
+    // 반영하는 동안 우리도 levelSettingsUpdated()를 부르게 되는데, 그것까지
+    // "사람이 바꿨다"로 남으면 방금 받은 것을 도로 보내게 된다. 반영이 끝난
+    // 다음에 지워야 해서 hushSettings()와 따로 둔다.
+    void clearSettingsDirty() {
+        g_settingsDirty = false;
+    }
+
     void syncLevelSettings() {
         if (!inRoom() || g_applyingRemote) return;
 
@@ -743,16 +765,18 @@ namespace coop {
             return;
         }
 
-        // 배경, 바닥, 색깔, 노래는 방장 것 하나만 쓴다.
+        // 사람이 실제로 바꿨을 때만 보낸다. 방장이든 손님이든 마찬가지다.
         //
-        // 양쪽이 다 올리면 서로 덮으며 끝나지 않는다. 두 사람이 같은 벽을
-        // 각자 다른 색으로 계속 칠하는 것과 같다. 원본이 방장의 레벨이니
-        // 벽지도 그 집 것을 따른다. 손님은 받아서 그대로 쓴다.
-        if (!g_hosting) return;
+        // 손님은 방의 설정을 받기 전까지는 아직 자기 레벨이 빈 상태라, 그것을
+        // 올리면 방장의 색이 흰 도화지로 덮인다. 그 전까지만 막는다.
+        if (!g_settingsDirty) return;
+        if (!g_hosting && !roomSettingsApplied()) return;
 
         auto text = levelSettingsString();
         if (text.empty() || text == g_lastSettings) return;
         g_lastSettings = text;
+
+        g_settingsDirty = false;
 
         matjson::Value msg;
         msg["type"] = "settings";
@@ -985,6 +1009,16 @@ namespace coop {
 // 삭제는 주기적 검사로는 알아채기 어려워서(사라진 걸 확인하려면 매번 전체를 훑어야 한다)
 // 여기서 바로 잡는다.
 class $modify(CoopLevelEditorLayer, LevelEditorLayer) {
+    // 게임이 설정 창을 닫을 때 부르는 함수다.
+    //
+    // 사람이 배경이나 색을 바꾸면 반드시 여기를 지나간다. 값을 견주어
+    // "바뀐 것 같다"고 짐작하는 대신, 게임이 알려주는 이 순간만 잡는다.
+    void levelSettingsUpdated() {
+        LevelEditorLayer::levelSettingsUpdated();
+        // 우리가 상대 것을 반영하느라 부른 것은 내 편집이 아니다.
+        if (!g_applyingRemote) g_settingsDirty = true;
+    }
+
     void removeObject(GameObject* object, bool noUndo) {
         if (!coop::isApplyingRemote() && object) {
             g_present.erase(object);

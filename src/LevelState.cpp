@@ -485,6 +485,10 @@ namespace coop {
             // GD가 설정 창을 닫을 때 부르는 것과 같은 함수다.
             editor->levelSettingsUpdated();
         }
+
+        // 방금 것은 상대가 바꾼 것이지 내가 바꾼 것이 아니다.
+        // 위에서 levelSettingsUpdated()를 부르며 생긴 표시를 여기서 지운다.
+        clearSettingsDirty();
     }
 
 }
