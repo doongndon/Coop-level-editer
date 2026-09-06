@@ -409,6 +409,10 @@ class $modify(CoopEditorUI, EditorUI) {
     }
 
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) {
+        // 앞선 손짓이 도중에 취소되면 뗐다는 소식이 안 온다. 그러면 손을 뗀
+        // 뒤에도 줄이 계속 손가락을 따라다닌다. 새 손짓이 시작될 때 풀어준다.
+        if (m_fields->m_dragging) this->releaseGrip();
+
         if (this->grabbedGrip(touch)) return true;
         auto handled = EditorUI::ccTouchBegan(touch, event);
         this->tellWhereIAm(touch);
@@ -431,16 +435,6 @@ class $modify(CoopEditorUI, EditorUI) {
         }
         EditorUI::ccTouchEnded(touch, event);
         this->tellWhereIAm(touch);
-    }
-
-    // 손짓이 도중에 취소되는 일도 있다. 여기서 놓아주지 않으면 손을 뗀 뒤에도
-    // 계속 끌려다닌다.
-    void ccTouchCancelled(CCTouch* touch, CCEvent* event) {
-        if (m_fields->m_dragging) {
-            this->releaseGrip();
-            return;
-        }
-        EditorUI::ccTouchCancelled(touch, event);
     }
 
     GameObject* createObject(int objectID, CCPoint position) {

@@ -41,6 +41,21 @@ namespace {
         return palette[sum % (sizeof(palette) / sizeof(palette[0]))];
     }
 
+    // 레벨을 얼마나 확대해 보고 있든 커서는 늘 같은 크기로 보이게 한다.
+    //
+    // 커서는 레벨 판 위에 붙어 있어서 레벨과 같이 커지고 작아진다. 그런데
+    // 에디터는 보통 한참 축소해놓고 쓴다. 축소 배율이 0.2쯤이면 반지름 7의
+    // 점이 1.4밖에 안 남아서 사실상 안 보인다. "상대 커서가 안 보인다"는 게
+    // 이것이었을 가능성이 크다. 배율의 역수를 곱해 상쇄한다.
+    //
+    // 지도를 축소해도 "현재 위치" 표시는 작아지지 않는 것과 같다.
+    float counterScale(CCNode* layer) {
+        if (!layer) return 1.f;
+        auto scale = layer->getScale();
+        if (scale < 0.05f) scale = 0.05f;
+        return 1.f / scale;
+    }
+
     CCNode* buildCursor(std::string const& name, ccColor3B color) {
         auto holder = CCNode::create();
         holder->setZOrder(30000);
@@ -56,12 +71,23 @@ namespace {
         dot->drawDot({ 0.f, 0.f }, 3.f, ccColor4F{ 1.f, 1.f, 1.f, 0.9f });
         holder->addChild(dot);
 
-        auto label = CCLabelBMFont::create(name.c_str(), "chatFont.fnt");
-        label->setScale(0.5f);
-        label->setColor(color);
-        label->setAnchorPoint({ 0.f, 0.5f });
-        label->setPosition({ 9.f, 9.f });
-        holder->addChild(label);
+        // 글꼴에 없는 글자가 섞이면 글자를 아예 못 만든다. 그리고 못 만든
+        // 것을 그대로 붙이면 게임이 죽는다. 그릴 수 있는 글자만 남긴다.
+        std::string plain;
+        for (auto ch : name) {
+            if (static_cast<unsigned char>(ch) >= 0x20 && static_cast<unsigned char>(ch) < 0x7f) {
+                plain.push_back(ch);
+            }
+        }
+        if (plain.empty()) plain = "?";
+
+        if (auto label = CCLabelBMFont::create(plain.c_str(), "chatFont.fnt")) {
+            label->setScale(0.5f);
+            label->setColor(color);
+            label->setAnchorPoint({ 0.f, 0.5f });
+            label->setPosition({ 9.f, 9.f });
+            holder->addChild(label);
+        }
 
         return holder;
     }
@@ -113,6 +139,8 @@ namespace coop {
         draw->clear();
         if (g_peerSelection.empty()) return;
 
+        // 테두리 두께도 레벨과 같이 얇아진다. 축소해놓고 보면 선이 사라진다.
+        auto thickness = 1.2f * counterScale(editor->m_objectLayer);
         auto line = ccColor4F{ 1.f, 0.75f, 0.3f, 0.9f };
         for (auto const& uid : g_peerSelection) {
             auto object = objectForUid(uid);
@@ -127,7 +155,7 @@ namespace coop {
             };
             // 속을 채우지 않고 테두리만. 상대가 무엇을 잡았는지 보이되
             // 그 물체 자체는 가리지 않아야 한다.
-            draw->drawPolygon(corners, 4, ccColor4F{ 0.f, 0.f, 0.f, 0.f }, 1.2f, line);
+            draw->drawPolygon(corners, 4, ccColor4F{ 0.f, 0.f, 0.f, 0.f }, thickness, line);
         }
     }
 
@@ -205,6 +233,7 @@ namespace coop {
 
         if (auto node = found->second.node.data()) {
             node->setPosition(position);
+            node->setScale(counterScale(editor->m_objectLayer));
             node->setVisible(true);
         }
         found->second.lastSeen = std::chrono::steady_clock::now();
@@ -237,6 +266,14 @@ namespace coop {
     }
 
     void fadeOldCursors() {
+        // 상대가 가만히 있어도 내가 확대/축소하면 크기가 어긋난다. 여기서 맞춘다.
+        if (auto editor = LevelEditorLayer::get(); editor && editor->m_objectLayer) {
+            auto scale = counterScale(editor->m_objectLayer);
+            for (auto& [id, cursor] : g_cursors) {
+                if (auto node = cursor.node.data()) node->setScale(scale);
+            }
+        }
+
         auto now = std::chrono::steady_clock::now();
         for (auto it = g_cursors.begin(); it != g_cursors.end();) {
             if (now - it->second.lastSeen > CURSOR_LIFETIME) {
