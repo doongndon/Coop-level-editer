@@ -27,6 +27,31 @@ class $modify(CoopEditorUI, EditorUI) {
         cocos2d::CCLayerColor* m_plate = nullptr;
     };
 
+    // 표시를 놓을 자리.
+    //
+    // 처음에는 위쪽 가운데에 뒀는데 거기는 레벨 스크롤 막대가 지나가는 자리다.
+    // 에디터는 사방이 버튼이라 어디가 비었는지는 쓰는 사람 화면마다 다르다.
+    // 그래서 자리를 설정에서 고르게 했다.
+    // 폭을 받는 이유는, 구석에 붙일 때 가운데 좌표를 폭에 맞춰 밀어야
+    // 화면 밖으로 삐져나가지 않기 때문이다.
+    cocos2d::CCPoint coopBarSpot(float width) {
+        auto size = CCDirector::get()->getWinSize();
+        auto spot = Mod::get()->getSettingValue<std::string>("hud-spot");
+
+        auto half = width / 2.f;
+        // 위쪽 버튼 줄과 스크롤 막대를 피해 그 아래로 내려온 높이.
+        auto high = size.height - 100.f;
+        auto low = 22.f;
+        auto left = 16.f + half;
+        auto right = size.width - 16.f - half;
+
+        if (spot == "top-right") return { right, high };
+        if (spot == "bottom-left") return { left, low };
+        if (spot == "bottom-right") return { right, low };
+        if (spot == "top-center") return { size.width / 2.f, size.height - 11.f };
+        return { left, high };   // top-left
+    }
+
     // 위쪽 줄에 들어갈 작은 버튼. 화면을 가리지 않도록 글자만 쓴다.
     CCMenuItemSpriteExtra* makeSmallButton(
         CCLabelBMFont* label, std::function<void(CCMenuItemSpriteExtra*)> action
@@ -80,8 +105,7 @@ class $modify(CoopEditorUI, EditorUI) {
         menu->setLayout(RowLayout::create()->setGap(14.f)->ignoreInvisibleChildren(true));
         menu->setZOrder(1000);
 
-        auto winSize = CCDirector::get()->getWinSize();
-        auto spot = cocos2d::CCPoint(winSize.width / 2.f, winSize.height - 11.f);
+        auto spot = this->coopBarSpot(0.f);
 
         // 판을 먼저 넣어야 글자 뒤로 간다.
         auto plate = CCLayerColor::create({ 0, 0, 0, 130 }, 10.f, 18.f);
@@ -207,8 +231,15 @@ class $modify(CoopEditorUI, EditorUI) {
                 }
                 if (shown > 1) width += (shown - 1) * 14.f;
 
-                plate->setContentSize({ width + 16.f, 18.f });
+                auto plateWidth = width + 16.f;
+                plate->setContentSize({ plateWidth, 18.f });
                 plate->setVisible(width > 0.f);
+
+                // 자리는 폭이 정해진 다음에 잡는다. 설정에서 바꿨을 수도 있으니
+                // 매번 다시 맞춘다.
+                auto spot = this->coopBarSpot(plateWidth);
+                plate->setPosition(spot);
+                menu->setPosition(spot);
             }
         }
     }
